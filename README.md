@@ -136,9 +136,20 @@ poussée sur `main`, vers `ghcr.io/poupouproject/taches-et-points-{arch}`. Chaqu
 architecture est construite sur un runner de la même architecture: émuler l'ARM
 en QEMU multiplierait la durée du build.
 
-**Pour livrer une mise à jour**, incrémenter `version:` dans
-`taches-et-points/config.yaml`. C'est ce numéro que le Supervisor cherche comme
-tag, et c'est lui qui déclenche le bouton « Mettre à jour » dans Home Assistant.
+**Pour livrer une mise à jour**, le versionnage passe par
+[Changesets](https://github.com/changesets/changesets) :
+
+```bash
+cd taches-et-points
+npm run changeset   # décrire le changement, choisir patch / minor / major
+# ... committer le fichier créé dans .changeset/ avec le changement ...
+npm run version     # bump package.json + config.yaml + CHANGELOG.md
+```
+
+`config.yaml` est le seul numéro que le Supervisor lit (c'est le tag GHCR
+publié, et ce qui déclenche le bouton « Mettre à jour »). `npm run version` le
+tient synchronisé avec `package.json`, il n'y a donc qu'un numéro à gérer — voir
+`.changeset/README.md`.
 
 **Au tout premier passage**, rendre les deux paquets GHCR publics (Profil
 GitHub → Packages → `taches-et-points-amd64` puis `-aarch64` → Package settings

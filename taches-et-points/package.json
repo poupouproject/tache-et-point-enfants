@@ -1,6 +1,6 @@
 {
   "name": "tache-et-point-enfants",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -12,7 +12,10 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "test": "node --conditions=react-server --import tsx --test tests/*.test.ts"
+    "test": "node --conditions=react-server --import tsx --test tests/*.test.ts",
+    "changeset": "changeset",
+    "version": "changeset version && node scripts/sync-addon-version.mjs",
+    "release:tag": "changeset tag"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.10.0",
@@ -31,6 +34,7 @@
     "zod": "^4.5.2"
   },
   "devDependencies": {
+    "@changesets/cli": "^3.0.1",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",

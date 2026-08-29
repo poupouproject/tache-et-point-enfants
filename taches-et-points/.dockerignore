@@ -11,6 +11,10 @@ node_modules
 *.db-journal
 tests
 
+# Outillage de versionnage: sans effet sur l'exécution, hors du contexte.
+.changeset
+scripts
+
 .git
 .gitignore
 Dockerfile
