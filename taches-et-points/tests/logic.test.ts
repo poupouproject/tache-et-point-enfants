@@ -311,6 +311,89 @@ describe("annulation par un parent", () => {
   });
 });
 
+describe("changement de récurrence", () => {
+  it("ne laisse pas repayer une tâche déjà faite aujourd'hui", async () => {
+    const { alex } = await makeKids();
+    const task = await m.prisma.task.create({
+      data: {
+        title: "Quotidienne",
+        type: "FAMILY",
+        pointsValue: 20,
+        recurrence: "DAILY",
+      },
+    });
+
+    await m.tasks.completeTask(task.id, alex.id);
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 20);
+
+    // Le parent la passe en hebdomadaire: la forme de la clé d'occurrence
+    // change, et sans remappage la complétion du jour deviendrait invisible.
+    await m.prisma.task.update({
+      where: { id: task.id },
+      data: { recurrence: "WEEKLY" },
+    });
+    await m.tasks.remapCompletionPeriods(task.id, "WEEKLY");
+
+    const retry = await m.tasks.completeTask(task.id, alex.id);
+
+    assert.equal(retry.ok, false, "la tâche reste faite pour cette occurrence");
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 20);
+  });
+
+  it("fusionne les complétions qui retombent sur la même occurrence", async () => {
+    const { alex } = await makeKids();
+    const task = await m.prisma.task.create({
+      data: {
+        title: "Quotidienne",
+        type: "FAMILY",
+        pointsValue: 5,
+        recurrence: "DAILY",
+      },
+    });
+
+    // Deux jours de la même semaine ISO.
+    await m.tasks.completeTask(task.id, alex.id, new Date("2026-08-24T15:00:00Z"));
+    await m.tasks.completeTask(task.id, alex.id, new Date("2026-08-25T15:00:00Z"));
+
+    await m.tasks.remapCompletionPeriods(task.id, "WEEKLY");
+
+    const remaining = await m.prisma.taskCompletion.findMany({
+      where: { taskId: task.id },
+    });
+    assert.equal(remaining.length, 1, "une seule occurrence hebdomadaire");
+
+    // Le grand livre garde les deux gains: on ne réécrit pas l'histoire.
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 10);
+  });
+});
+
+describe("tâches masquées", () => {
+  it("garde au tableau le travail déjà fait aujourd'hui", async () => {
+    const { alex } = await makeKids();
+    const task = await m.prisma.task.create({
+      data: {
+        title: "Balayer",
+        type: "FAMILY",
+        pointsValue: 25,
+        recurrence: "DAILY",
+      },
+    });
+
+    await m.tasks.completeTask(task.id, alex.id);
+    await m.prisma.task.update({
+      where: { id: task.id },
+      data: { active: false },
+    });
+
+    const board = await m.tasks.buildBoard();
+    const card = board.find((c) => c.id === alex.id);
+    assert.ok(card);
+
+    assert.equal(card.doneToday.length, 1, "la tâche faite reste affichée");
+    assert.equal(card.doneToday[0].title, "Balayer");
+  });
+});
+
 describe("boutique et argent", () => {
   it("refuse un achat au-dessus du solde", async () => {
     const { alex } = await makeKids();

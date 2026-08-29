@@ -1,11 +1,13 @@
 /**
  * Amorçage de la base.
  *
- * Idempotent: on peut le relancer sans dupliquer. Il s'exécute aussi au
- * démarrage de l'add-on, ce qui garantit qu'il y a toujours des PIN utilisables
- * même sur une base vierge.
+ * RÉSERVÉ AU DÉVELOPPEMENT. Ce script n'est jamais lancé par l'add-on: en
+ * production, les NIP sont choisis par un parent sur l'écran de première
+ * configuration. Le brancher au démarrage installerait les NIP ci-dessous —
+ * publics, puisqu'ils sont écrits ici — sur une installation réelle.
  *
- * PIN par défaut: 1234 (accès) et 9999 (parent) — à changer dans l'app.
+ * Idempotent: on peut le relancer sans dupliquer.
+ * NIP de développement: 1234 (accès) et 9999 (parent).
  */
 
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";

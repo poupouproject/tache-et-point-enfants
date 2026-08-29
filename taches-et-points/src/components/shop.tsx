@@ -133,6 +133,12 @@ export function MoneyConverter({
   const maxDollars = Math.floor(balance / pointsPerDollar);
   const [dollars, setDollars] = useState(1);
 
+  // Le solde peut avoir baissé depuis le premier rendu (un achat fait ailleurs,
+  // un ajustement d'un parent). Sans ce plafond, le champ caché enverrait un
+  // montant que l'enfant ne peut plus payer, alors que l'écran vient de le lui
+  // proposer.
+  const requested = Math.min(dollars, maxDollars);
+
   return (
     <section className="panel p-5">
       <h2 className="flex items-center gap-2 font-hud text-base text-white">
@@ -157,26 +163,26 @@ export function MoneyConverter({
             <input
               type="hidden"
               name="points"
-              value={dollars * pointsPerDollar}
+              value={requested * pointsPerDollar}
             />
 
             <div>
               <label htmlFor="dollars" className="label">
-                Montant : {dollars} $
+                Montant : {requested} $
               </label>
               <input
                 id="dollars"
                 type="range"
                 min={1}
                 max={maxDollars}
-                value={dollars}
+                value={requested}
                 onChange={(event) => setDollars(Number(event.target.value))}
                 className="w-full accent-emerald-500"
               />
               <p className="mt-2 text-sm text-hud-400">
                 Coûte{" "}
                 <span className="font-bold text-coin">
-                  {dollars * pointsPerDollar} pièces
+                  {requested * pointsPerDollar} pièces
                 </span>
               </p>
             </div>
@@ -189,7 +195,7 @@ export function MoneyConverter({
               {pending ? (
                 <LoaderCircle className="size-5 animate-spin" aria-hidden />
               ) : (
-                `Demander ${dollars} $`
+                `Demander ${requested} $`
               )}
             </button>
           </form>

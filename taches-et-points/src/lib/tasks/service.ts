@@ -64,9 +64,23 @@ export async function buildBoard(now: Date = new Date()): Promise<ChildBoard[]> 
   );
 
   const todayKey = dateKeyOf(now);
+
+  // Ce qui a été fait aujourd'hui se lit indépendamment des tâches actives:
+  // masquer une tâche ne doit pas effacer d'un coup le travail déjà accompli
+  // par un enfant sur sa carte. On repart de la veille pour couvrir tous les
+  // fuseaux, puis on filtre sur la journée locale.
+  const since = new Date(now);
+  since.setDate(since.getDate() - 2);
+
+  const todayCompletions = await prisma.taskCompletion.findMany({
+    where: { completedAt: { gte: since } },
+    include: { task: { select: { title: true } } },
+  });
+
   const streaks = await computeStreaks(
     children.map((child) => child.id),
     todayKey,
+    now,
   );
 
   return children.map((child) => {
@@ -96,14 +110,14 @@ export async function buildBoard(now: Date = new Date()): Promise<ChildBoard[]> 
       });
     }
 
-    const doneToday = completions
+    const doneToday = todayCompletions
       .filter(
         (completion) =>
           completion.childId === child.id &&
           dateKeyOf(completion.completedAt) === todayKey,
       )
       .map((completion) => ({
-        title: tasks.find((task) => task.id === completion.taskId)?.title ?? "Tâche",
+        title: completion.task?.title ?? "Tâche",
         points: completion.pointsAwarded,
       }));
 
@@ -128,11 +142,12 @@ export async function buildBoard(now: Date = new Date()): Promise<ChildBoard[]> 
 async function computeStreaks(
   childIds: string[],
   todayKey: string,
+  now: Date,
 ): Promise<Map<string, number>> {
   if (childIds.length === 0) return new Map();
 
   // 60 jours suffisent largement pour une série familiale, et bornent la lecture.
-  const since = new Date();
+  const since = new Date(now);
   since.setDate(since.getDate() - 60);
 
   const completions = await prisma.taskCompletion.findMany({
@@ -253,6 +268,52 @@ export async function revokeCompletion(completionId: string): Promise<boolean> {
   });
 
   return true;
+}
+
+/**
+ * Réécrit les clés d'occurrence après un changement de récurrence.
+ *
+ * La `periodKey` dérive de la récurrence: passer une tâche de quotidienne à
+ * hebdomadaire change la forme de la clé, et les complétions existantes ne
+ * correspondent alors plus à rien. La tâche réapparaîtrait comme à faire alors
+ * qu'elle a déjà été payée aujourd'hui — donc payée deux fois.
+ *
+ * On recalcule donc chaque clé à partir de la date de complétion. Quand
+ * plusieurs complétions retombent sur la même occurrence (deux jours de la
+ * même semaine qui deviennent une seule semaine), on garde la plus récente:
+ * l'occurrence est faite, et les gains déjà écrits au grand livre restent.
+ */
+export async function remapCompletionPeriods(
+  taskId: string,
+  newRecurrence: string,
+): Promise<void> {
+  const completions = await prisma.taskCompletion.findMany({
+    where: { taskId },
+    orderBy: { completedAt: "desc" },
+  });
+
+  if (completions.length === 0) return;
+
+  const keep = new Map<string, string>(); // nouvelle clé -> id conservé
+  const drop: string[] = [];
+
+  // Les complétions sont triées de la plus récente à la plus ancienne: la
+  // première rencontrée pour une clé est donc celle qu'on garde.
+  for (const completion of completions) {
+    const key = periodKeyFor(newRecurrence, completion.completedAt);
+    if (keep.has(key)) drop.push(completion.id);
+    else keep.set(key, completion.id);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (drop.length > 0) {
+      await tx.taskCompletion.deleteMany({ where: { id: { in: drop } } });
+    }
+
+    for (const [periodKey, id] of keep) {
+      await tx.taskCompletion.update({ where: { id }, data: { periodKey } });
+    }
+  });
 }
 
 function isUniqueViolation(error: unknown): boolean {

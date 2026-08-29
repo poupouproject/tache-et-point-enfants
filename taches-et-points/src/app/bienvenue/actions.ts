@@ -35,8 +35,8 @@ export async function completeSetup(
   await prisma.appSettings.create({
     data: {
       id: 1,
-      accessPinHash: hashPin(accessPin),
-      parentPinHash: hashPin(parentPin),
+      accessPinHash: await hashPin(accessPin),
+      parentPinHash: await hashPin(parentPin),
       pointsPerDollar: 100,
     },
   });

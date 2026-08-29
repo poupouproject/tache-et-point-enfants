@@ -9,12 +9,17 @@ import {
   hashPin,
   lockKiosk,
   requireParent,
+  requireUnlocked,
+  verifyPin,
 } from "@/lib/auth/session";
 import { CHILD_COLOR_KEYS, RECURRENCES, TASK_TYPES } from "@/lib/constants";
 import { recordTransaction } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
 import { resolveConversion, resolveRedemption } from "@/lib/rewards/service";
-import { revokeCompletion } from "@/lib/tasks/service";
+import {
+  remapCompletionPeriods,
+  revokeCompletion,
+} from "@/lib/tasks/service";
 
 export type FormState = { error?: string; success?: string };
 
@@ -50,7 +55,11 @@ export async function saveChild(
   const id = String(formData.get("id") ?? "");
 
   if (id) {
-    await prisma.child.update({ where: { id }, data: parsed.data });
+    const updated = await prisma.child.updateMany({
+      where: { id },
+      data: parsed.data,
+    });
+    if (updated.count === 0) return { error: "Cet enfant n'existe plus." };
   } else {
     const count = await prisma.child.count();
     await prisma.child.create({
@@ -150,7 +159,17 @@ export async function saveTask(
   const id = String(formData.get("id") ?? "");
 
   if (id) {
+    const existing = await prisma.task.findUnique({ where: { id } });
+    if (!existing) return { error: "Cette tâche n'existe plus." };
+
     await prisma.task.update({ where: { id }, data });
+
+    // La clé d'occurrence dérive de la récurrence: si elle change, les
+    // complétions déjà enregistrées doivent suivre, sans quoi la tâche
+    // redeviendrait à faire alors qu'elle a déjà été payée.
+    if (existing.recurrence !== data.recurrence) {
+      await remapCompletionPeriods(id, data.recurrence);
+    }
   } else {
     const count = await prisma.task.count();
     await prisma.task.create({ data: { ...data, sortOrder: count } });
@@ -174,8 +193,10 @@ export async function toggleTask(formData: FormData) {
 export async function deleteTask(formData: FormData) {
   await requireParent();
 
+  // deleteMany plutôt que delete: une double soumission ou un identifiant
+  // périmé ne doit pas faire tomber la page sur une erreur Prisma.
   const id = String(formData.get("id") ?? "");
-  await prisma.task.delete({ where: { id } });
+  await prisma.task.deleteMany({ where: { id } });
 
   revalidateAll();
 }
@@ -230,7 +251,10 @@ export async function saveReward(
   const id = String(formData.get("id") ?? "");
 
   if (id) {
-    await prisma.reward.update({ where: { id }, data });
+    const updated = await prisma.reward.updateMany({ where: { id }, data });
+    if (updated.count === 0) {
+      return { error: "Cette récompense n'existe plus." };
+    }
   } else {
     const count = await prisma.reward.count();
     await prisma.reward.create({ data: { ...data, sortOrder: count } });
@@ -358,17 +382,36 @@ export async function saveSettings(
     return { error: parsed.error.issues[0]?.message ?? "Données invalides." };
   }
 
+  const settings = await prisma.appSettings.findUnique({ where: { id: 1 } });
+  if (!settings) return { error: "Application non configurée." };
+
+  // Les deux NIP doivent rester différents, sinon les enfants entrent dans
+  // l'espace parents. Quand un seul des deux change, on le compare au hash de
+  // l'autre — c'est la seule façon de tester l'égalité sans stocker de clair.
+  const newAccess = parsed.data.accessPin ?? "";
+  const newParent = parsed.data.parentPin ?? "";
+
+  let collides = Boolean(newAccess && newParent && newAccess === newParent);
+  if (!collides && newAccess && !newParent) {
+    collides = await verifyPin(newAccess, settings.parentPinHash);
+  }
+  if (!collides && newParent && !newAccess) {
+    collides = await verifyPin(newParent, settings.accessPinHash);
+  }
+
+  if (collides) {
+    return {
+      error: "Le NIP d'entrée et le NIP parent doivent être différents.",
+    };
+  }
+
   // Un champ NIP laissé vide veut dire « ne change pas ce NIP ».
   await prisma.appSettings.update({
     where: { id: 1 },
     data: {
       pointsPerDollar: parsed.data.pointsPerDollar,
-      ...(parsed.data.accessPin
-        ? { accessPinHash: hashPin(parsed.data.accessPin) }
-        : {}),
-      ...(parsed.data.parentPin
-        ? { parentPinHash: hashPin(parsed.data.parentPin) }
-        : {}),
+      ...(newAccess ? { accessPinHash: await hashPin(newAccess) } : {}),
+      ...(newParent ? { parentPinHash: await hashPin(newParent) } : {}),
     },
   });
 
@@ -379,6 +422,9 @@ export async function saveSettings(
 // --- Session ---------------------------------------------------------------
 
 export async function leaveParentMode() {
+  // Comme toute Server Action, celle-ci est joignable par POST direct: sans ce
+  // contrôle, l'appeler suffirait à obtenir une session.
+  await requireUnlocked();
   await exitParentMode();
   redirect("/");
 }

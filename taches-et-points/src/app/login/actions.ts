@@ -3,17 +3,23 @@
 import { redirect } from "next/navigation";
 
 import { getSettings, unlockKiosk, verifyPin } from "@/lib/auth/session";
+import {
+  recordFailure,
+  recordSuccess,
+  retryMessage,
+  secondsUntilRetry,
+} from "@/lib/auth/throttle";
 
 export type PinState = { error?: string };
 
-/**
- * Déverrouille le kiosque. Un délai constant en cas d'échec évite de
- * transformer le formulaire en oracle de temps de réponse.
- */
+/** Déverrouille le kiosque. */
 export async function submitAccessPin(
   _prev: PinState,
   formData: FormData,
 ): Promise<PinState> {
+  const waiting = secondsUntilRetry("access");
+  if (waiting > 0) return { error: retryMessage(waiting) };
+
   const pin = String(formData.get("pin") ?? "");
 
   if (!/^\d{4,8}$/.test(pin)) {
@@ -25,11 +31,12 @@ export async function submitAccessPin(
     return { error: "L'application n'est pas encore configurée." };
   }
 
-  if (!verifyPin(pin, settings.accessPinHash)) {
-    await new Promise((resolve) => setTimeout(resolve, 600));
+  if (!(await verifyPin(pin, settings.accessPinHash))) {
+    recordFailure("access");
     return { error: "NIP incorrect." };
   }
 
+  recordSuccess("access");
   await unlockKiosk();
   redirect("/");
 }

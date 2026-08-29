@@ -8,6 +8,12 @@ import {
   requireUnlocked,
   verifyPin,
 } from "@/lib/auth/session";
+import {
+  recordFailure,
+  recordSuccess,
+  retryMessage,
+  secondsUntilRetry,
+} from "@/lib/auth/throttle";
 
 export type PinState = { error?: string };
 
@@ -16,6 +22,9 @@ export async function submitParentPin(
   formData: FormData,
 ): Promise<PinState> {
   await requireUnlocked();
+
+  const waiting = secondsUntilRetry("parent");
+  if (waiting > 0) return { error: retryMessage(waiting) };
 
   const pin = String(formData.get("pin") ?? "");
 
@@ -26,11 +35,12 @@ export async function submitParentPin(
   const settings = await getSettings();
   if (!settings) return { error: "Application non configurée." };
 
-  if (!verifyPin(pin, settings.parentPinHash)) {
-    await new Promise((resolve) => setTimeout(resolve, 600));
+  if (!(await verifyPin(pin, settings.parentPinHash))) {
+    recordFailure("parent");
     return { error: "NIP incorrect." };
   }
 
+  recordSuccess("parent");
   await enterParentMode();
   redirect("/parent");
 }
