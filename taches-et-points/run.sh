@@ -42,7 +42,17 @@ DATABASE_URL="file:$DATA_DIR/app.db"
 export DATABASE_URL
 
 echo "[taches-et-points] application des migrations…"
-npx prisma migrate deploy --config prisma7.config.ts
+# Le CLI Prisma vit dans son propre arbre de modules: il ne sert qu'ici, et la
+# sortie autonome de Next ne l'embarque pas. NODE_PATH est nécessaire parce que
+# prisma7.config.ts, chargé depuis /app, importe dotenv — qui n'existe que dans
+# cet arbre-là.
+NODE_PATH=/app/migrator-modules/node_modules \
+  ./migrator-modules/node_modules/.bin/prisma migrate deploy --config prisma7.config.ts
 
-echo "[taches-et-points] démarrage sur le port ${PORT:-3000} (fuseau $APP_TIMEZONE)"
-exec npx next start --port "${PORT:-3000}" --hostname 0.0.0.0
+# Le serveur autonome lit PORT et HOSTNAME dans l'environnement.
+PORT="${PORT:-3000}"
+HOSTNAME=0.0.0.0
+export PORT HOSTNAME
+
+echo "[taches-et-points] démarrage sur le port $PORT (fuseau $APP_TIMEZONE)"
+exec node server.js

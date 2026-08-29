@@ -26,8 +26,23 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma = globalForPrisma.prisma ?? createClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+function client(): PrismaClient {
+  globalForPrisma.prisma ??= createClient();
+  return globalForPrisma.prisma;
 }
+
+/**
+ * Le client est construit à la première requête, pas à l'import.
+ *
+ * C'est ce qui permet à `next build` de charger les modules sans DATABASE_URL:
+ * au build, on ne fait qu'importer, jamais interroger. La configuration de
+ * connexion reste ainsi une affaire d'exécution, pas de compilation.
+ */
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, property) {
+    const instance = client();
+    const value = Reflect.get(instance, property);
+    // Les méthodes comme $transaction doivent garder le client comme `this`.
+    return typeof value === "function" ? value.bind(instance) : value;
+  },
+});

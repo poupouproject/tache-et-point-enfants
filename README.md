@@ -78,6 +78,20 @@ absolument être correct: l'arbitrage des tâches familiales (y compris deux
 confirmations vraiment simultanées), l'annulation par un parent, le calcul des
 récurrences, et l'impossibilité de dépenser deux fois les mêmes pièces.
 
+### Après un `npm install` sous Windows ou macOS
+
+Régénérer le lockfile dans un conteneur Linux :
+
+```bash
+docker run --rm -v "$PWD:/app" -w /app node:24-bookworm-slim \
+  npm install --package-lock-only --ignore-scripts
+```
+
+npm n'inscrit dans `package-lock.json` que les dépendances optionnelles de la
+plateforme courante. Un lockfile produit sous Windows n'a donc pas les binaires
+natifs Linux (ceux de Tailwind, notamment), et le `npm ci` de l'image Docker
+échoue avec « package.json and package-lock.json are not in sync ».
+
 ### Variables d'environnement
 
 | Variable | Rôle |
@@ -102,6 +116,14 @@ Dans l'add-on, ces trois variables sont gérées automatiquement par `run.sh`.
 3. Ouvrir `http://<ip-de-home-assistant>:3000` et choisir les deux NIP.
 
 Options de l'add-on : `timezone` (fuseau de la famille) et `log_level`.
+
+Pour construire et essayer l'image sans Home Assistant :
+
+```bash
+cd taches-et-points
+docker build --build-arg BUILD_FROM=node:24-bookworm-slim -t taches-et-points .
+docker run -d -v tepdata:/data -p 3000:3000 taches-et-points
+```
 
 À savoir :
 
