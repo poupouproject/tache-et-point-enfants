@@ -1,0 +1,6 @@
+# Les scripts shell doivent garder des fins de ligne LF: un run.sh en CRLF
+# échoue dans le conteneur Linux avec « bad interpreter ».
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf

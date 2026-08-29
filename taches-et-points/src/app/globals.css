@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/*
+ * Thème « console de jeu »: fond sombre type HUD, accents vifs en aplat,
+ * boutons épais avec un vrai enfoncement au clic. Les enfants ont 8 et 10 ans —
+ * on vise l'esthétique d'un menu de jeu, pas d'une application pour tout-petits.
+ */
+
+@theme {
+  --color-hud-950: #0b1020;
+  --color-hud-900: #121a2e;
+  --color-hud-800: #1a2540;
+  --color-hud-700: #263354;
+  --color-hud-600: #36456b;
+  --color-hud-400: #7c8bb5;
+  --color-hud-200: #c3cce6;
+
+  --color-coin: #fbbf24;
+  --color-coin-dark: #b45309;
+
+  --font-hud: var(--font-press-start), ui-monospace, monospace;
+  --font-body: var(--font-rubik), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% -10%,
+      color-mix(in oklab, var(--color-hud-700) 55%, transparent),
+      transparent
+    ),
+    var(--color-hud-950);
+  color: var(--color-hud-200);
+  font-family: var(--font-body);
+}
+
+/*
+ * Bouton « touche de manette »: une bordure basse épaisse fait l'ombre portée,
+ * et l'appui la mange en descendant le bouton — l'effet 3D vient de là, sans
+ * transformation coûteuse ni image.
+ *
+ * Déclaré avec `@utility` (et non dans `@layer components`) car les variantes
+ * ci-dessous le reprennent via `@apply`, ce que Tailwind v4 n'autorise que
+ * pour de vraies utilities.
+ */
+@utility btn-3d {
+  @apply relative inline-flex items-center justify-center gap-2 rounded-2xl
+    border-b-[6px] px-6 py-4 text-lg font-extrabold uppercase tracking-wide
+    transition-all duration-75 select-none
+    active:translate-y-[5px] active:border-b-[1px]
+    disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0
+    disabled:active:border-b-[6px]
+    focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-white;
+}
+
+@utility btn-primary {
+  @apply btn-3d border-emerald-800 bg-emerald-500 text-emerald-950
+    hover:bg-emerald-400;
+}
+
+@utility btn-secondary {
+  @apply btn-3d border-hud-800 bg-hud-700 text-hud-200 hover:bg-hud-600;
+}
+
+@utility btn-danger {
+  @apply btn-3d border-rose-900 bg-rose-600 text-white hover:bg-rose-500;
+}
+
+@utility btn-coin {
+  @apply btn-3d border-coin-dark bg-coin text-amber-950 hover:bg-amber-300;
+}
+
+/* Panneau type fenêtre de HUD. */
+@utility panel {
+  @apply rounded-3xl border-2 border-hud-700 bg-hud-900/80 shadow-2xl
+    shadow-black/50 backdrop-blur;
+}
+
+@utility field {
+  @apply w-full rounded-2xl border-2 border-hud-700 bg-hud-950 px-4 py-3
+    text-lg text-white placeholder:text-hud-400
+    focus:border-sky-500 focus:outline-none;
+}
+
+@utility label {
+  @apply mb-2 block text-sm font-bold uppercase tracking-wide text-hud-400;
+}
+
+@utility chip {
+  @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs
+    font-bold uppercase tracking-wide;
+}
+
+/* Pièce qui « tombe » quand une tâche est confirmée. */
+@keyframes coin-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.5);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-28px) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-60px) scale(1);
+  }
+}
+
+.animate-coin-pop {
+  animation: coin-pop 0.9s ease-out forwards;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-pop-in {
+  animation: pop-in 0.18s ease-out;
+}
+
+/* Respecte les préférences système de réduction de mouvement. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-coin-pop,
+  .animate-pop-in {
+    animation: none;
+  }
+}

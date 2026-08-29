@@ -1,0 +1,36 @@
+---
+name: Quêtes & Pièces
+version: "1.0.0"
+slug: taches-et-points
+description: >-
+  Tâches et points pour les enfants, avec récompenses et conversion en argent.
+url: https://github.com/jonathanpoulin/tache-et-point-enfants
+arch:
+  - amd64
+  - aarch64
+# L'image n'embarque pas d'init (pas de s6): on laisse Docker en fournir un,
+# pour que les signaux d'arrêt atteignent Node et que rien ne devienne zombie.
+init: true
+
+# Volontairement PAS d'ingress: l'app doit être joignable directement par URL
+# sur le réseau local (http://<ip-ha>:3000), sans passer par une session Home
+# Assistant ni apparaître dans la barre latérale. C'est le NIP de l'app qui
+# protège l'accès.
+ingress: false
+ports:
+  3000/tcp: 3000
+ports_description:
+  3000/tcp: Interface web (NIP requis)
+
+# /data est fourni par le Supervisor: persistant entre les redémarrages et les
+# mises à jour, et inclus dans les sauvegardes Home Assistant. C'est là que vit
+# la base SQLite.
+map:
+  - data:rw
+
+options:
+  timezone: America/Toronto
+  log_level: info
+schema:
+  timezone: str
+  log_level: list(trace|debug|info|notice|warning|error|fatal)

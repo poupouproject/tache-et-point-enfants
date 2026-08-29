@@ -1,0 +1,18 @@
+# Sans cette exclusion, le `COPY . .` du Dockerfile écraserait les dépendances
+# installées dans l'image par celles de la machine hôte — y compris les binaires
+# natifs compilés pour un autre système.
+node_modules
+.next
+
+# Base et secrets locaux: ne doivent jamais entrer dans une image.
+.env
+.env.*
+*.db
+*.db-journal
+tests
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md
