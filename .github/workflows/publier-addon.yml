@@ -1,0 +1,123 @@
+name: Publier l'image de l'add-on
+
+# Le Supervisor télécharge l'image au lieu de la construire (clé `image:` dans
+# config.yaml): compiler Next.js sur le matériel Home Assistant serait lent, et
+# franchement pénible sur un Raspberry Pi.
+#
+# Chaque architecture est construite sur un runner de la même architecture:
+# émuler l'ARM en QEMU multiplierait la durée du build par cinq ou plus.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "taches-et-points/**"
+      - ".github/workflows/publier-addon.yml"
+  pull_request:
+    paths:
+      - "taches-et-points/**"
+      - ".github/workflows/publier-addon.yml"
+  workflow_dispatch:
+
+env:
+  ADDON_DIR: taches-et-points
+
+jobs:
+  construire:
+    name: ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Lire la version et l'image de base
+        id: infos
+        run: |
+          set -euo pipefail
+
+          # La version de l'add-on fait foi: c'est le tag que le Supervisor
+          # cherche, donc il faut l'incrémenter pour publier une mise à jour.
+          version="$(sed -nE 's/^version:[[:space:]]*"?([^"]+)"?[[:space:]]*$/\1/p' \
+            "$ADDON_DIR/config.yaml")"
+
+          # L'image de base vient de build.yaml pour éviter de la dupliquer ici.
+          build_from="$(sed -nE "s/^[[:space:]]+${{ matrix.arch }}:[[:space:]]*(.+)$/\1/p" \
+            "$ADDON_DIR/build.yaml")"
+
+          if [ -z "$version" ] || [ -z "$build_from" ]; then
+            echo "Version ou image de base introuvable" >&2
+            exit 1
+          fi
+
+          # GHCR n'accepte que des minuscules dans le nom du dépôt.
+          owner="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+
+          {
+            echo "version=$version"
+            echo "build_from=$build_from"
+            echo "image=ghcr.io/$owner/taches-et-points-${{ matrix.arch }}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Version $version, base $build_from"
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Sur une pull request on construit sans publier: on veut savoir que
+      # l'image compile, sans pousser un tag depuis une branche.
+      - name: Se connecter à GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construire et publier
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.ADDON_DIR }}
+          build-args: BUILD_FROM=${{ steps.infos.outputs.build_from }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ steps.infos.outputs.image }}:${{ steps.infos.outputs.version }}
+            ${{ steps.infos.outputs.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          provenance: false
+
+      - name: Vérifier que l'image démarre
+        run: |
+          set -euo pipefail
+
+          # On reconstruit en local (le cache rend l'opération quasi gratuite)
+          # pour pouvoir lancer l'image même quand rien n'a été publié.
+          docker build \
+            --build-arg BUILD_FROM=${{ steps.infos.outputs.build_from }} \
+            -t addon-verification "$ADDON_DIR"
+
+          docker run -d --name verif -p 8099:3000 addon-verification
+
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://localhost:8099/bienvenue; then
+              echo "L'add-on répond."
+              docker rm -f verif > /dev/null
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "L'add-on n'a pas répondu à temps:" >&2
+          docker logs verif >&2
+          exit 1

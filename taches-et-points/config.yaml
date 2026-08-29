@@ -8,6 +8,13 @@ url: https://github.com/poupouproject/tache-et-point-enfants
 arch:
   - amd64
   - aarch64
+
+# Avec cette clé, le Supervisor TÉLÉCHARGE l'image au lieu de la construire:
+# compiler Next.js sur le matériel Home Assistant prendrait de longues minutes.
+# `{arch}` est remplacé par le Supervisor, et le tag utilisé est le `version:`
+# ci-dessus — il faut donc l'incrémenter pour publier une mise à jour.
+# Les images sont produites par .github/workflows/publier-addon.yml.
+image: ghcr.io/poupouproject/taches-et-points-{arch}
 # L'image n'embarque pas d'init (pas de s6): on laisse Docker en fournir un,
 # pour que les signaux d'arrêt atteignent Node et que rien ne devienne zombie.
 init: true

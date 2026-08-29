@@ -125,6 +125,26 @@ docker build --build-arg BUILD_FROM=node:24-bookworm-slim -t taches-et-points .
 docker run -d -v tepdata:/data -p 3000:3000 taches-et-points
 ```
 
+### Publication des images
+
+Le Supervisor **télécharge** l'image, il ne la construit pas: `config.yaml`
+porte une clé `image:`, et compiler Next.js sur le matériel Home Assistant
+serait long (très long sur un Raspberry Pi).
+
+Les images sont produites par `.github/workflows/publier-addon.yml`, à chaque
+poussée sur `main`, vers `ghcr.io/poupouproject/taches-et-points-{arch}`. Chaque
+architecture est construite sur un runner de la même architecture: émuler l'ARM
+en QEMU multiplierait la durée du build.
+
+**Pour livrer une mise à jour**, incrémenter `version:` dans
+`taches-et-points/config.yaml`. C'est ce numéro que le Supervisor cherche comme
+tag, et c'est lui qui déclenche le bouton « Mettre à jour » dans Home Assistant.
+
+**Au tout premier passage**, rendre les deux paquets GHCR publics (Profil
+GitHub → Packages → `taches-et-points-amd64` puis `-aarch64` → Package settings
+→ Change visibility → Public). Sans ça, Home Assistant ne peut pas les
+télécharger: il n'est pas authentifié auprès de GHCR.
+
 À savoir :
 
 - **Le dépôt doit être public.** Le Supervisor n'a pas de support propre pour un
