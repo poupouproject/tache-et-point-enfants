@@ -1,22 +1,63 @@
 # Changesets
 
-Ce dossier gère le versionnage de l'add-on avec
+Ce dossier gère la version et le journal des changements de l'add-on avec
 [Changesets](https://github.com/changesets/changesets).
 
-## Le lien avec la version de l'add-on
+## La règle
 
-Home Assistant ne lit pas `package.json`: la version qui fait foi pour le
-Supervisor est `version:` dans `config.yaml`, et c'est le tag que la CI publie
-sur GHCR. Pour ne pas avoir deux versions à tenir à jour, `npm run version`
-applique les changesets à `package.json` **puis** recopie ce numéro dans
-`config.yaml` (voir `scripts/sync-addon-version.mjs`). Il n'y a donc qu'un seul
-geste à faire.
+**Toute branche qui touche à `taches-et-points/` ajoute un changeset.** La CI le
+vérifie (`.github/workflows/verifier-changeset.yml`) et refuse la pull request
+sinon.
 
-## Au quotidien
+```bash
+cd taches-et-points
+npx changeset            # décrire le changement, choisir patch / minor / major
+```
 
-1. Après un changement notable : `npm run changeset`, choisir `patch` / `minor`
-   / `major`, décrire ce qui change (ce texte finit dans le CHANGELOG).
-2. Committer le fichier `.md` créé ici, avec le reste du changement.
-3. Pour préparer une publication : `npm run version` (met à jour la version,
-   `config.yaml` et `CHANGELOG.md`), committer, fusionner sur `main`. La CI
-   publie alors l'image sous le nouveau tag.
+Committez le fichier `.md` créé ici avec le reste de la branche.
+
+Pour un changement sans aucun effet visible (CI, refactor, dépendances
+internes), la porte de sortie prévue est un changeset vide — il satisfait la
+CI sans polluer le journal :
+
+```bash
+npx changeset add --empty
+```
+
+## Comment écrire l'entrée
+
+Ce texte n'est pas un message de commit: il finit dans `CHANGELOG.md`, que
+**Home Assistant affiche sur la page de l'add-on**. Il est lu par un parent qui
+se demande s'il vaut la peine de mettre à jour.
+
+- Écrire ce que la personne voit changer, pas comment c'est codé.
+- Une phrase suffit. Pas de nom de fichier, pas de nom de fonction.
+- Au présent, en français.
+
+```
+Bien: Les tâches d'un enfant masqué n'apparaissent plus sur le tableau.
+Moins bien: Correction du filtre dans buildBoard (service.ts).
+```
+
+Choix du niveau :
+
+| Niveau  | Quand                                                      |
+| ------- | ---------------------------------------------------------- |
+| `patch` | Correction, ajustement d'affichage                          |
+| `minor` | Nouvelle capacité (un type de tâche, un écran, un réglage)   |
+| `major` | Changement qui casse l'existant ou force une intervention   |
+
+## Publier une version
+
+```bash
+npm run version   # applique les changesets: package.json + config.yaml + CHANGELOG.md
+```
+
+Committer le résultat, puis fusionner sur `main`: la CI publie l'image sous le
+nouveau tag, et Home Assistant propose la mise à jour.
+
+Home Assistant ne lit pas `package.json` — la version qui fait foi pour le
+Supervisor est `version:` dans `config.yaml`, et c'est le tag publié sur GHCR.
+`npm run version` recopie donc le numéro dans `config.yaml`
+(`scripts/sync-addon-version.mjs`), pour qu'il n'y ait qu'un seul numéro à
+faire évoluer.

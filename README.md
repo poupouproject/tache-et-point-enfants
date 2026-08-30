@@ -146,10 +146,16 @@ npm run changeset   # décrire le changement, choisir patch / minor / major
 npm run version     # bump package.json + config.yaml + CHANGELOG.md
 ```
 
+**Toute branche qui touche à `taches-et-points/` doit ajouter un changeset**, et
+la CI le vérifie. Ce n'est pas de la bureaucratie: le texte du changeset devient
+une entrée de `taches-et-points/CHANGELOG.md`, que Home Assistant affiche sur la
+page de l'add-on. C'est ce qu'un parent lit pour décider s'il met à jour, donc
+l'entrée se rédige dans ses mots — voir `taches-et-points/.changeset/README.md`.
+Pour un changement sans effet visible: `npx changeset add --empty`.
+
 `config.yaml` est le seul numéro que le Supervisor lit (c'est le tag GHCR
 publié, et ce qui déclenche le bouton « Mettre à jour »). `npm run version` le
-tient synchronisé avec `package.json`, il n'y a donc qu'un numéro à gérer — voir
-`.changeset/README.md`.
+tient synchronisé avec `package.json`, il n'y a donc qu'un numéro à gérer.
 
 **Au tout premier passage**, rendre les deux paquets GHCR publics (Profil
 GitHub → Packages → `taches-et-points-amd64` puis `-aarch64` → Package settings
