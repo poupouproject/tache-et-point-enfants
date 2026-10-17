@@ -1,5 +1,6 @@
 /**
- * Recopie la version de package.json dans config.yaml.
+ * Recopie la version de package.json dans config.yaml, et retire de
+ * CHANGELOG.md les titres anglais que Changesets y ajoute.
  *
  * Changesets ne connaît que package.json, mais c'est `version:` dans
  * config.yaml que le Supervisor lit et que la CI publie comme tag GHCR. Ce
@@ -38,4 +39,17 @@ if (updated === config) {
 } else {
   writeFileSync(configPath, updated);
   console.log(`config.yaml -> ${version}`);
+}
+
+// Changesets range les entrées sous « ### Patch Changes », « ### Minor
+// Changes »… en anglais, et aucun réglage ne le change. Le journal est lu par
+// un parent: on retire ces titres, la version suffit à regrouper les entrées,
+// comme dans la section 1.0.0 écrite à la main.
+const changelogPath = join(root, "CHANGELOG.md");
+const changelog = readFileSync(changelogPath, "utf8");
+const cleaned = changelog.replace(/^### (Major|Minor|Patch) Changes\r?\n\r?\n/gm, "");
+
+if (cleaned !== changelog) {
+  writeFileSync(changelogPath, cleaned);
+  console.log("CHANGELOG.md: titres de Changesets retirés");
 }
