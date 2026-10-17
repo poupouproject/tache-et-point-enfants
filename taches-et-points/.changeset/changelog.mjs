@@ -25,4 +25,6 @@ async function getDependencyReleaseLine() {
   return "";
 }
 
-export default { getReleaseLine, getDependencyReleaseLine };
+const changelogFunctions = { getReleaseLine, getDependencyReleaseLine };
+
+export default changelogFunctions;
