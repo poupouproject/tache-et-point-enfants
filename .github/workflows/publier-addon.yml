@@ -74,25 +74,15 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      # Sur une pull request on construit sans publier: on veut savoir que
-      # l'image compile, sans pousser un tag depuis une branche.
-      - name: Se connecter à GHCR
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Construire et publier
+      # On construit d'abord en local, sans rien publier: une image qui ne
+      # démarre pas ne doit jamais atteindre GHCR.
+      - name: Construire
         uses: docker/build-push-action@v6
         with:
           context: ${{ env.ADDON_DIR }}
           build-args: BUILD_FROM=${{ steps.infos.outputs.build_from }}
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: |
-            ${{ steps.infos.outputs.image }}:${{ steps.infos.outputs.version }}
-            ${{ steps.infos.outputs.image }}:latest
+          load: true
+          tags: addon-verification
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
           provenance: false
@@ -100,12 +90,6 @@ jobs:
       - name: Vérifier que l'image démarre
         run: |
           set -euo pipefail
-
-          # On reconstruit en local (le cache rend l'opération quasi gratuite)
-          # pour pouvoir lancer l'image même quand rien n'a été publié.
-          docker build \
-            --build-arg BUILD_FROM=${{ steps.infos.outputs.build_from }} \
-            -t addon-verification "$ADDON_DIR"
 
           docker run -d --name verif -p 8099:3000 addon-verification
 
@@ -121,3 +105,44 @@ jobs:
           echo "L'add-on n'a pas répondu à temps:" >&2
           docker logs verif >&2
           exit 1
+
+      # Sur une pull request on s'arrête là: on veut savoir que l'image compile
+      # et démarre, sans pousser un tag depuis une branche.
+      - name: Se connecter à GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Un tag de version déjà publié ne se réécrit pas: les installations qui
+      # l'ont déjà recevraient d'autres binaires sans qu'Home Assistant affiche
+      # de mise à jour. Le code fusionné sans `npm run version` attend donc la
+      # prochaine version pour être publié.
+      - name: Vérifier que la version est nouvelle
+        id: nouvelle
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+
+          if docker buildx imagetools inspect \
+              "${{ steps.infos.outputs.image }}:${{ steps.infos.outputs.version }}" > /dev/null 2>&1; then
+            echo "::notice::La version ${{ steps.infos.outputs.version }} est déjà publiée: rien n'est poussé. Lancer \`npm run version\` pour publier ces changements."
+            echo "publier=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publier=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publier
+        if: github.event_name != 'pull_request' && steps.nouvelle.outputs.publier == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.ADDON_DIR }}
+          build-args: BUILD_FROM=${{ steps.infos.outputs.build_from }}
+          push: true
+          tags: |
+            ${{ steps.infos.outputs.image }}:${{ steps.infos.outputs.version }}
+            ${{ steps.infos.outputs.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          provenance: false

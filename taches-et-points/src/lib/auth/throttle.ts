@@ -31,17 +31,27 @@ function gateFor(key: string): Gate {
 }
 
 /**
- * Secondes restantes avant de pouvoir réessayer, 0 si la voie est libre.
- * À appeler AVANT de comparer le NIP.
+ * Réserve une tentative: renvoie les secondes à attendre si le verrou est armé,
+ * sinon compte la tentative comme un échec et renvoie 0. À appeler AVANT de
+ * comparer le NIP; un NIP correct efface ensuite l'ardoise (`recordSuccess`).
+ *
+ * L'échec est compté d'avance parce que la comparaison bcrypt est asynchrone:
+ * si on ne le comptait qu'après, des milliers de requêtes lancées en parallèle
+ * passeraient toutes la barrière avant qu'un seul échec soit enregistré. La
+ * vérification et la réservation se font sans `await` entre les deux, donc de
+ * façon atomique dans le processus.
  */
-export function secondsUntilRetry(key: string): number {
+export function reserveAttempt(key: string): number {
   const gate = gateFor(key);
   const remaining = gate.lockedUntil - Date.now();
-  return remaining > 0 ? Math.ceil(remaining / 1000) : 0;
+  if (remaining > 0) return Math.ceil(remaining / 1000);
+
+  recordFailure(key);
+  return 0;
 }
 
 /** Enregistre un échec et arme le verrou quand les essais libres sont épuisés. */
-export function recordFailure(key: string): void {
+function recordFailure(key: string): void {
   const gate = gateFor(key);
   gate.failures += 1;
 

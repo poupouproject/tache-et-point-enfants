@@ -16,10 +16,7 @@ import { CHILD_COLOR_KEYS, RECURRENCES, TASK_TYPES } from "@/lib/constants";
 import { recordTransaction } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
 import { resolveConversion, resolveRedemption } from "@/lib/rewards/service";
-import {
-  remapCompletionPeriods,
-  revokeCompletion,
-} from "@/lib/tasks/service";
+import { revokeCompletion, updateTask } from "@/lib/tasks/service";
 
 export type FormState = { error?: string; success?: string };
 
@@ -159,16 +156,10 @@ export async function saveTask(
   const id = String(formData.get("id") ?? "");
 
   if (id) {
-    const existing = await prisma.task.findUnique({ where: { id } });
-    if (!existing) return { error: "Cette tâche n'existe plus." };
-
-    await prisma.task.update({ where: { id }, data });
-
     // La clé d'occurrence dérive de la récurrence: si elle change, les
-    // complétions déjà enregistrées doivent suivre, sans quoi la tâche
-    // redeviendrait à faire alors qu'elle a déjà été payée.
-    if (existing.recurrence !== data.recurrence) {
-      await remapCompletionPeriods(id, data.recurrence);
+    // complétions déjà enregistrées suivent, dans la même transaction.
+    if (!(await updateTask(id, data))) {
+      return { error: "Cette tâche n'existe plus." };
     }
   } else {
     const count = await prisma.task.count();

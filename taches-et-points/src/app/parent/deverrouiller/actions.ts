@@ -9,10 +9,9 @@ import {
   verifyPin,
 } from "@/lib/auth/session";
 import {
-  recordFailure,
   recordSuccess,
+  reserveAttempt,
   retryMessage,
-  secondsUntilRetry,
 } from "@/lib/auth/throttle";
 
 export type PinState = { error?: string };
@@ -23,20 +22,20 @@ export async function submitParentPin(
 ): Promise<PinState> {
   await requireUnlocked();
 
-  const waiting = secondsUntilRetry("parent");
-  if (waiting > 0) return { error: retryMessage(waiting) };
-
   const pin = String(formData.get("pin") ?? "");
 
   if (!/^\d{4,8}$/.test(pin)) {
     return { error: "Le NIP doit contenir de 4 à 8 chiffres." };
   }
 
+  // La tentative est comptée avant la comparaison, pas après: voir throttle.ts.
+  const waiting = reserveAttempt("parent");
+  if (waiting > 0) return { error: retryMessage(waiting) };
+
   const settings = await getSettings();
   if (!settings) return { error: "Application non configurée." };
 
   if (!(await verifyPin(pin, settings.parentPinHash))) {
-    recordFailure("parent");
     return { error: "NIP incorrect." };
   }
 

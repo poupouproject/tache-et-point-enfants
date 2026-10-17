@@ -8,7 +8,7 @@ import { requireUnlocked } from "@/lib/auth/session";
 import { childColor } from "@/lib/constants";
 import { balanceOf, formatMoney } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
-import { buildBoard } from "@/lib/tasks/service";
+import { streakOf } from "@/lib/tasks/service";
 import { formatDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
@@ -20,10 +20,12 @@ export default async function ChildPage({ params }: PageProps<"/enfant/[id]">) {
   // Next 16: les params de route sont asynchrones.
   const { id } = await params;
 
+  // Un enfant désactivé n'a plus de carte au tableau: sa boutique ne doit pas
+  // rester joignable par l'URL.
   const child = await prisma.child.findUnique({ where: { id } });
-  if (!child) notFound();
+  if (!child || !child.active) notFound();
 
-  const [balance, settings, rewards, transactions, board] = await Promise.all([
+  const [balance, settings, rewards, transactions, streak] = await Promise.all([
     balanceOf(prisma, child.id),
     prisma.appSettings.findUnique({ where: { id: 1 } }),
     prisma.reward.findMany({
@@ -35,11 +37,10 @@ export default async function ChildPage({ params }: PageProps<"/enfant/[id]">) {
       orderBy: { createdAt: "desc" },
       take: 40,
     }),
-    buildBoard(),
+    streakOf(child.id),
   ]);
 
   const colors = childColor(child.color);
-  const streak = board.find((entry) => entry.id === child.id)?.streak ?? 0;
   const pointsPerDollar = settings?.pointsPerDollar ?? 100;
 
   return (

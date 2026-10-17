@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { balancesByChild, recordTransaction } from "@/lib/ledger";
 import { isDueNow, periodKeyFor } from "@/lib/tasks/due";
@@ -180,6 +181,28 @@ async function computeStreaks(
   return streaks;
 }
 
+/** Série d'un seul enfant, sans construire le tableau de toute la famille. */
+export async function streakOf(
+  childId: string,
+  now: Date = new Date(),
+): Promise<number> {
+  const streaks = await computeStreaks([childId], dateKeyOf(now), now);
+  return streaks.get(childId) ?? 0;
+}
+
+/**
+ * Un enfant désactivé garde son historique mais ne gagne ni ne dépense plus.
+ * Les Server Actions reçoivent le childId du formulaire: sans ce contrôle, un
+ * POST direct suffirait à créditer un enfant masqué ou un identifiant inventé.
+ */
+export async function isActiveChild(childId: string): Promise<boolean> {
+  const child = await prisma.child.findUnique({
+    where: { id: childId },
+    select: { active: true },
+  });
+  return child?.active === true;
+}
+
 export type CompleteResult =
   | { ok: true; points: number; title: string }
   | { ok: false; reason: "ALREADY_TAKEN" | "NOT_AVAILABLE" };
@@ -202,6 +225,9 @@ export async function completeTask(
   if (!task || !task.active) return { ok: false, reason: "NOT_AVAILABLE" };
   if (!isDueNow(task, now)) return { ok: false, reason: "NOT_AVAILABLE" };
   if (task.type === "INDIVIDUAL" && task.assignedChildId !== childId) {
+    return { ok: false, reason: "NOT_AVAILABLE" };
+  }
+  if (!(await isActiveChild(childId))) {
     return { ok: false, reason: "NOT_AVAILABLE" };
   }
 
@@ -244,17 +270,23 @@ export async function completeTask(
  * l'occurrence à nouveau disponible — mais on n'efface jamais la transaction
  * d'origine: on ajoute une écriture inverse, pour que l'historique montre à la
  * fois le gain et son annulation.
+ *
+ * La lecture et la suppression sont dans la même transaction, et seule la
+ * requête qui supprime vraiment la ligne écrit l'inverse: un double clic sur
+ * « Annuler » ne retire pas les points deux fois et ne lève pas d'erreur.
  */
 export async function revokeCompletion(completionId: string): Promise<boolean> {
-  const completion = await prisma.taskCompletion.findUnique({
-    where: { id: completionId },
-    include: { task: { select: { title: true } } },
-  });
+  return prisma.$transaction(async (tx) => {
+    const completion = await tx.taskCompletion.findUnique({
+      where: { id: completionId },
+      include: { task: { select: { title: true } } },
+    });
+    if (!completion) return false;
 
-  if (!completion) return false;
-
-  await prisma.$transaction(async (tx) => {
-    await tx.taskCompletion.delete({ where: { id: completion.id } });
+    const deleted = await tx.taskCompletion.deleteMany({
+      where: { id: completion.id },
+    });
+    if (deleted.count === 0) return false;
 
     await recordTransaction(tx, {
       childId: completion.childId,
@@ -265,10 +297,38 @@ export async function revokeCompletion(completionId: string): Promise<boolean> {
       description: `Annulé: ${completion.task?.title ?? "tâche"}`,
       createdBy: "PARENT",
     });
-  });
 
-  return true;
+    return true;
+  });
 }
+
+/**
+ * Met à jour une tâche et, si sa récurrence change, remappe ses complétions
+ * dans la même transaction. Faites en deux temps, les deux écritures laissaient
+ * une fenêtre où la tâche portait déjà sa nouvelle récurrence sans qu'aucune
+ * complétion ne corresponde à la nouvelle clé: un enfant pouvait la confirmer
+ * — et être payé — une deuxième fois.
+ */
+export async function updateTask(
+  taskId: string,
+  data: Prisma.TaskUncheckedUpdateInput & { recurrence: string },
+): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.task.findUnique({ where: { id: taskId } });
+    if (!existing) return false;
+
+    await tx.task.update({ where: { id: taskId }, data });
+
+    if (existing.recurrence !== data.recurrence) {
+      await remapCompletionPeriods(tx, taskId, data.recurrence);
+    }
+
+    return true;
+  });
+}
+
+/** Préfixe des clés d'occurrence mises de côté par un remappage. */
+const ARCHIVED_PERIOD_PREFIX = "archive:";
 
 /**
  * Réécrit les clés d'occurrence après un changement de récurrence.
@@ -280,40 +340,55 @@ export async function revokeCompletion(completionId: string): Promise<boolean> {
  *
  * On recalcule donc chaque clé à partir de la date de complétion. Quand
  * plusieurs complétions retombent sur la même occurrence (deux jours de la
- * même semaine qui deviennent une seule semaine), on garde la plus récente:
- * l'occurrence est faite, et les gains déjà écrits au grand livre restent.
+ * même semaine qui deviennent une seule semaine), la plus récente prend la
+ * clé de l'occurrence. Les autres ne sont pas supprimées: elles portent les
+ * séries, la liste « fait aujourd'hui » et l'annulation par un parent. Elles
+ * reçoivent une clé d'archive qui leur est propre, qui ne correspond à aucune
+ * occurrence et respecte la contrainte unique (taskId, periodKey).
+ *
+ * Appelée dans la transaction qui change la récurrence (voir `updateTask`).
  */
 export async function remapCompletionPeriods(
+  tx: Prisma.TransactionClient,
   taskId: string,
   newRecurrence: string,
 ): Promise<void> {
-  const completions = await prisma.taskCompletion.findMany({
+  const completions = await tx.taskCompletion.findMany({
     where: { taskId },
     orderBy: { completedAt: "desc" },
   });
 
   if (completions.length === 0) return;
 
-  const keep = new Map<string, string>(); // nouvelle clé -> id conservé
-  const drop: string[] = [];
+  const targets = new Map<string, string>(); // id -> nouvelle clé
+  const claimed = new Set<string>();
 
   // Les complétions sont triées de la plus récente à la plus ancienne: la
-  // première rencontrée pour une clé est donc celle qu'on garde.
+  // première rencontrée pour une clé est donc celle qui la prend.
   for (const completion of completions) {
     const key = periodKeyFor(newRecurrence, completion.completedAt);
-    if (keep.has(key)) drop.push(completion.id);
-    else keep.set(key, completion.id);
+    if (claimed.has(key)) {
+      targets.set(completion.id, `${ARCHIVED_PERIOD_PREFIX}${completion.id}`);
+    } else {
+      claimed.add(key);
+      targets.set(completion.id, key);
+    }
   }
 
-  await prisma.$transaction(async (tx) => {
-    if (drop.length > 0) {
-      await tx.taskCompletion.deleteMany({ where: { id: { in: drop } } });
-    }
+  // Deux passes: une clé visée peut être occupée par une autre complétion
+  // pas encore réécrite. On libère d'abord toutes les clés en passant par
+  // l'archive, puis on pose les clés définitives.
+  for (const id of targets.keys()) {
+    await tx.taskCompletion.update({
+      where: { id },
+      data: { periodKey: `${ARCHIVED_PERIOD_PREFIX}${id}` },
+    });
+  }
 
-    for (const [periodKey, id] of keep) {
-      await tx.taskCompletion.update({ where: { id }, data: { periodKey } });
-    }
-  });
+  for (const [id, periodKey] of targets) {
+    if (periodKey.startsWith(ARCHIVED_PERIOD_PREFIX)) continue;
+    await tx.taskCompletion.update({ where: { id }, data: { periodKey } });
+  }
 }
 
 function isUniqueViolation(error: unknown): boolean {

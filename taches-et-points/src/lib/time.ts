@@ -7,7 +7,25 @@
  * que par l'heure locale du process.
  */
 
-export const APP_TIMEZONE = process.env.APP_TIMEZONE || "America/Toronto";
+const DEFAULT_TIMEZONE = "America/Toronto";
+
+/**
+ * Le fuseau vient d'un champ libre des options de l'add-on. Un nom qu'Intl ne
+ * reconnaît pas (« Montreal », « EST5 ») lèverait un RangeError au chargement
+ * de ce module et ferait tomber toutes les pages: on retombe plutôt sur le
+ * fuseau par défaut. run.sh fait la même vérification et l'annonce au journal.
+ */
+function resolveTimezone(candidate: string | undefined): string {
+  if (!candidate) return DEFAULT_TIMEZONE;
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone: candidate });
+    return candidate;
+  } catch {
+    return DEFAULT_TIMEZONE;
+  }
+}
+
+export const APP_TIMEZONE = resolveTimezone(process.env.APP_TIMEZONE);
 
 /** Parties calendaires d'un instant, dans le fuseau de la famille. */
 export function localParts(date: Date = new Date(), timeZone = APP_TIMEZONE) {

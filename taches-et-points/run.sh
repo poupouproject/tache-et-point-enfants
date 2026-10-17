@@ -17,9 +17,15 @@ mkdir -p "$DATA_DIR"
 if [ -f "$OPTIONS_FILE" ]; then
   OPTION_TZ="$(node -e "try{const o=require('$OPTIONS_FILE');process.stdout.write(o.timezone||'')}catch(e){}")"
   if [ -n "$OPTION_TZ" ]; then
-    APP_TIMEZONE="$OPTION_TZ"
-    TZ="$OPTION_TZ"
-    export TZ
+    # Un fuseau inconnu ferait planter l'application: on le refuse ici, avec
+    # un message lisible dans le journal de l'add-on.
+    if TZ_CANDIDATE="$OPTION_TZ" node -e "new Intl.DateTimeFormat('en-CA',{timeZone:process.env.TZ_CANDIDATE})" 2>/dev/null; then
+      APP_TIMEZONE="$OPTION_TZ"
+      TZ="$OPTION_TZ"
+      export TZ
+    else
+      echo "[taches-et-points] fuseau « $OPTION_TZ » inconnu, America/Toronto utilisé (exemple valide: America/Montreal)" >&2
+    fi
   fi
 fi
 APP_TIMEZONE="${APP_TIMEZONE:-America/Toronto}"

@@ -2,6 +2,7 @@ import "server-only";
 
 import { balanceOf, pointsToCents, recordTransaction } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
+import { isActiveChild } from "@/lib/tasks/service";
 
 export type SpendResult =
   | { ok: true }
@@ -23,6 +24,7 @@ export async function requestReward(
 ): Promise<SpendResult> {
   const reward = await prisma.reward.findUnique({ where: { id: rewardId } });
   if (!reward || !reward.active) return { ok: false, reason: "NOT_FOUND" };
+  if (!(await isActiveChild(childId))) return { ok: false, reason: "NOT_FOUND" };
 
   return prisma.$transaction(async (tx) => {
     const balance = await balanceOf(tx, childId);
@@ -65,6 +67,7 @@ export async function requestConversion(
   if (points <= 0 || amountCents <= 0) {
     return { ok: false, reason: "NOT_FOUND" };
   }
+  if (!(await isActiveChild(childId))) return { ok: false, reason: "NOT_FOUND" };
 
   return prisma.$transaction(async (tx) => {
     const balance = await balanceOf(tx, childId);
@@ -94,24 +97,27 @@ export async function requestConversion(
  * Résolution d'une demande de récompense par un parent.
  * Un refus recrédite les points via une écriture inverse — jamais en effaçant
  * le débit d'origine, pour que l'historique montre la demande et son refus.
+ *
+ * Le passage de PENDING au statut final est un `updateMany` filtré sur PENDING,
+ * dans la même transaction que le remboursement: si un parent tape deux fois
+ * « Refuser », seul le premier clic change la ligne, donc seul lui rembourse.
  */
 export async function resolveRedemption(
   redemptionId: string,
   status: "FULFILLED" | "REJECTED",
 ): Promise<boolean> {
-  const redemption = await prisma.rewardRedemption.findUnique({
-    where: { id: redemptionId },
-  });
-
-  if (!redemption || redemption.status !== "PENDING") return false;
-
-  await prisma.$transaction(async (tx) => {
-    await tx.rewardRedemption.update({
-      where: { id: redemption.id },
+  return prisma.$transaction(async (tx) => {
+    const resolved = await tx.rewardRedemption.updateMany({
+      where: { id: redemptionId, status: "PENDING" },
       data: { status, resolvedAt: new Date() },
     });
+    if (resolved.count === 0) return false;
 
     if (status === "REJECTED") {
+      const redemption = await tx.rewardRedemption.findUniqueOrThrow({
+        where: { id: redemptionId },
+      });
+
       await recordTransaction(tx, {
         childId: redemption.childId,
         type: "MANUAL_ADJUST",
@@ -122,9 +128,9 @@ export async function resolveRedemption(
         createdBy: "PARENT",
       });
     }
-  });
 
-  return true;
+    return true;
+  });
 }
 
 /** Résolution d'une demande de conversion en argent par un parent. */
@@ -132,19 +138,19 @@ export async function resolveConversion(
   conversionId: string,
   status: "PAID" | "REJECTED",
 ): Promise<boolean> {
-  const conversion = await prisma.moneyConversion.findUnique({
-    where: { id: conversionId },
-  });
-
-  if (!conversion || conversion.status !== "PENDING") return false;
-
-  await prisma.$transaction(async (tx) => {
-    await tx.moneyConversion.update({
-      where: { id: conversion.id },
+  return prisma.$transaction(async (tx) => {
+    // Même garde que pour les récompenses: un seul refus rembourse.
+    const resolved = await tx.moneyConversion.updateMany({
+      where: { id: conversionId, status: "PENDING" },
       data: { status, resolvedAt: new Date() },
     });
+    if (resolved.count === 0) return false;
 
     if (status === "REJECTED") {
+      const conversion = await tx.moneyConversion.findUniqueOrThrow({
+        where: { id: conversionId },
+      });
+
       await recordTransaction(tx, {
         childId: conversion.childId,
         type: "MANUAL_ADJUST",
@@ -155,9 +161,9 @@ export async function resolveConversion(
         createdBy: "PARENT",
       });
     }
-  });
 
-  return true;
+    return true;
+  });
 }
 
 /** Demandes en attente, pour le badge et l'écran d'approbation du mode parent. */

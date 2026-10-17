@@ -328,11 +328,7 @@ describe("changement de récurrence", () => {
 
     // Le parent la passe en hebdomadaire: la forme de la clé d'occurrence
     // change, et sans remappage la complétion du jour deviendrait invisible.
-    await m.prisma.task.update({
-      where: { id: task.id },
-      data: { recurrence: "WEEKLY" },
-    });
-    await m.tasks.remapCompletionPeriods(task.id, "WEEKLY");
+    await m.tasks.updateTask(task.id, { recurrence: "WEEKLY" });
 
     const retry = await m.tasks.completeTask(task.id, alex.id);
 
@@ -355,15 +351,87 @@ describe("changement de récurrence", () => {
     await m.tasks.completeTask(task.id, alex.id, new Date("2026-08-24T15:00:00Z"));
     await m.tasks.completeTask(task.id, alex.id, new Date("2026-08-25T15:00:00Z"));
 
-    await m.tasks.remapCompletionPeriods(task.id, "WEEKLY");
+    await m.tasks.updateTask(task.id, { recurrence: "WEEKLY" });
 
     const remaining = await m.prisma.taskCompletion.findMany({
       where: { taskId: task.id },
     });
-    assert.equal(remaining.length, 1, "une seule occurrence hebdomadaire");
+    const weekKey = m.due.periodKeyFor("WEEKLY", remaining[0].completedAt);
+    assert.equal(
+      remaining.filter((c) => c.periodKey === weekKey).length,
+      1,
+      "une seule occurrence hebdomadaire",
+    );
 
     // Le grand livre garde les deux gains: on ne réécrit pas l'histoire.
     assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 10);
+  });
+
+  it("garde les complétions fusionnées pour la série et l'annulation", async () => {
+    const { alex } = await makeKids();
+    const task = await m.prisma.task.create({
+      data: {
+        title: "Quotidienne",
+        type: "FAMILY",
+        pointsValue: 5,
+        recurrence: "DAILY",
+      },
+    });
+
+    // Trois jours d'affilée qui finissent aujourd'hui, posés à la main pour
+    // maîtriser completedAt (la base l'horodate sinon à l'instant présent).
+    const now = new Date();
+    for (const daysAgo of [2, 1, 0]) {
+      const at = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+      await m.prisma.taskCompletion.create({
+        data: {
+          taskId: task.id,
+          childId: alex.id,
+          periodKey: m.due.periodKeyFor("DAILY", at),
+          pointsAwarded: 5,
+          completedAt: at,
+        },
+      });
+    }
+
+    assert.equal(await m.tasks.streakOf(alex.id, now), 3);
+
+    await m.tasks.updateTask(task.id, { recurrence: "ONE_TIME" });
+
+    const remaining = await m.prisma.taskCompletion.findMany({
+      where: { taskId: task.id },
+      orderBy: { completedAt: "asc" },
+    });
+    assert.equal(remaining.length, 3, "aucune complétion n'est supprimée");
+    assert.equal(
+      remaining.filter((c) => c.periodKey === "once").length,
+      1,
+      "une seule tient l'occurrence",
+    );
+    assert.equal(await m.tasks.streakOf(alex.id, now), 3, "la série survit");
+
+    // Une complétion archivée reste annulable par un parent.
+    assert.equal(await m.tasks.revokeCompletion(remaining[0].id), true);
+  });
+
+  it("revient sans heurt à la récurrence d'origine", async () => {
+    const { alex } = await makeKids();
+    const task = await m.prisma.task.create({
+      data: {
+        title: "Quotidienne",
+        type: "FAMILY",
+        pointsValue: 5,
+        recurrence: "DAILY",
+      },
+    });
+
+    await m.tasks.completeTask(task.id, alex.id);
+    await m.tasks.updateTask(task.id, { recurrence: "WEEKLY" });
+    await m.tasks.updateTask(task.id, { recurrence: "DAILY" });
+
+    const retry = await m.tasks.completeTask(task.id, alex.id);
+    assert.equal(retry.ok, false, "toujours faite aujourd'hui");
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 5);
   });
 });
 
@@ -556,5 +624,141 @@ describe("tableau de bord", () => {
 
     assert.equal(board.find((c) => c.id === alex.id)!.tasks.length, 1);
     assert.equal(board.find((c) => c.id === sam.id)!.tasks.length, 0);
+  });
+});
+
+describe("double clics d'un parent", () => {
+  it("n'annule qu'une fois une confirmation", async () => {
+    const { alex } = await makeKids();
+    const task = await m.prisma.task.create({
+      data: {
+        title: "Balayer",
+        type: "FAMILY",
+        pointsValue: 25,
+        recurrence: "DAILY",
+      },
+    });
+
+    await m.tasks.completeTask(task.id, alex.id);
+    const completion = await m.prisma.taskCompletion.findFirst();
+
+    const results = await Promise.all([
+      m.tasks.revokeCompletion(completion!.id),
+      m.tasks.revokeCompletion(completion!.id),
+    ]);
+
+    assert.deepEqual(results.sort(), [false, true]);
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 0);
+  });
+
+  it("ne rembourse qu'une fois une récompense refusée", async () => {
+    const { alex } = await makeKids();
+    await m.ledger.recordTransaction(m.prisma, {
+      childId: alex.id,
+      type: "MANUAL_ADJUST",
+      points: 500,
+      source: "MANUAL",
+      description: "Départ",
+    });
+    const reward = await m.prisma.reward.create({
+      data: { name: "Vélo", costPoints: 500 },
+    });
+
+    await m.rewards.requestReward(alex.id, reward.id);
+    const redemption = await m.prisma.rewardRedemption.findFirst();
+
+    const results = await Promise.all([
+      m.rewards.resolveRedemption(redemption!.id, "REJECTED"),
+      m.rewards.resolveRedemption(redemption!.id, "REJECTED"),
+    ]);
+
+    assert.deepEqual(results.sort(), [false, true]);
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 500);
+  });
+
+  it("ne rembourse qu'une fois une conversion refusée", async () => {
+    const { alex } = await makeKids();
+    await m.ledger.recordTransaction(m.prisma, {
+      childId: alex.id,
+      type: "MANUAL_ADJUST",
+      points: 300,
+      source: "MANUAL",
+      description: "Départ",
+    });
+
+    await m.rewards.requestConversion(alex.id, 300);
+    const conversion = await m.prisma.moneyConversion.findFirst();
+
+    await Promise.all([
+      m.rewards.resolveConversion(conversion!.id, "REJECTED"),
+      m.rewards.resolveConversion(conversion!.id, "REJECTED"),
+    ]);
+
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 300);
+  });
+});
+
+describe("enfant désactivé", () => {
+  it("ne gagne plus de points ni ne dépense", async () => {
+    const { alex } = await makeKids();
+    await m.ledger.recordTransaction(m.prisma, {
+      childId: alex.id,
+      type: "MANUAL_ADJUST",
+      points: 100,
+      source: "MANUAL",
+      description: "Départ",
+    });
+    const task = await m.prisma.task.create({
+      data: {
+        title: "Balayer",
+        type: "FAMILY",
+        pointsValue: 25,
+        recurrence: "DAILY",
+      },
+    });
+    const reward = await m.prisma.reward.create({
+      data: { name: "Jeu", costPoints: 50 },
+    });
+
+    await m.prisma.child.update({
+      where: { id: alex.id },
+      data: { active: false },
+    });
+
+    assert.equal((await m.tasks.completeTask(task.id, alex.id)).ok, false);
+    assert.equal((await m.rewards.requestReward(alex.id, reward.id)).ok, false);
+    assert.equal((await m.rewards.requestConversion(alex.id, 100)).ok, false);
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 100);
+  });
+
+  it("refuse proprement un identifiant inventé", async () => {
+    const task = await m.prisma.task.create({
+      data: {
+        title: "Balayer",
+        type: "FAMILY",
+        pointsValue: 25,
+        recurrence: "DAILY",
+      },
+    });
+
+    const result = await m.tasks.completeTask(task.id, "inexistant");
+    assert.equal(result.ok, false);
+  });
+});
+
+describe("frein du NIP", () => {
+  it("verrouille même quand les essais arrivent en parallèle", async () => {
+    const throttle = await import("../src/lib/auth/throttle");
+    const key = `test-${Date.now()}`;
+
+    // Aucune comparaison n'a encore répondu: c'est la réservation seule qui
+    // doit faire barrage, comme pour des requêtes lancées en rafale.
+    const waits = Array.from({ length: 50 }, () => throttle.reserveAttempt(key));
+
+    assert.equal(waits.filter((w) => w === 0).length, 6, "5 essais libres + 1");
+    assert.ok(waits.slice(6).every((w) => w > 0));
+
+    throttle.recordSuccess(key);
+    assert.equal(throttle.reserveAttempt(key), 0, "un succès efface l'ardoise");
   });
 });

@@ -4,10 +4,9 @@ import { redirect } from "next/navigation";
 
 import { getSettings, unlockKiosk, verifyPin } from "@/lib/auth/session";
 import {
-  recordFailure,
   recordSuccess,
+  reserveAttempt,
   retryMessage,
-  secondsUntilRetry,
 } from "@/lib/auth/throttle";
 
 export type PinState = { error?: string };
@@ -17,14 +16,15 @@ export async function submitAccessPin(
   _prev: PinState,
   formData: FormData,
 ): Promise<PinState> {
-  const waiting = secondsUntilRetry("access");
-  if (waiting > 0) return { error: retryMessage(waiting) };
-
   const pin = String(formData.get("pin") ?? "");
 
   if (!/^\d{4,8}$/.test(pin)) {
     return { error: "Le NIP doit contenir de 4 à 8 chiffres." };
   }
+
+  // La tentative est comptée avant la comparaison, pas après: voir throttle.ts.
+  const waiting = reserveAttempt("access");
+  if (waiting > 0) return { error: retryMessage(waiting) };
 
   const settings = await getSettings();
   if (!settings) {
@@ -32,7 +32,6 @@ export async function submitAccessPin(
   }
 
   if (!(await verifyPin(pin, settings.accessPinHash))) {
-    recordFailure("access");
     return { error: "NIP incorrect." };
   }
 

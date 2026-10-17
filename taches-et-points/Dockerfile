@@ -29,13 +29,16 @@ RUN npm run build
 FROM ${BUILD_FROM} AS migrator
 
 WORKDIR /migrator
-# On lit les versions dans le package.json du projet, puis on repart d'un
+# On lit les versions exactes dans le lockfile du projet, puis on repart d'un
 # package.json vide: installer dans celui du projet tirerait aussi toutes les
 # dépendances de l'application, ce qu'on cherche précisément à éviter ici.
+# Le lockfile plutôt que les plages de package.json: le CLI de migration doit
+# être celui avec lequel le client de l'application a été généré, et le même
+# d'un build à l'autre du même commit.
 # dotenv accompagne prisma parce que prisma7.config.ts l'importe.
-COPY package.json ./versions.json
-RUN PRISMA_VERSION="$(node -p "require('./versions.json').dependencies.prisma")" \
-    && DOTENV_VERSION="$(node -p "require('./versions.json').dependencies.dotenv")" \
+COPY package-lock.json ./versions.json
+RUN PRISMA_VERSION="$(node -p "require('./versions.json').packages['node_modules/prisma'].version")" \
+    && DOTENV_VERSION="$(node -p "require('./versions.json').packages['node_modules/dotenv'].version")" \
     && rm versions.json \
     && npm init -y > /dev/null \
     && npm install --omit=dev "prisma@$PRISMA_VERSION" "dotenv@$DOTENV_VERSION" \
