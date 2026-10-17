@@ -1,0 +1,11 @@
+---
+# On part directement des images Node officielles plutôt que des bases Home
+# Assistant: l'add-on n'utilise ni bashio ni s6 (la base est un fichier SQLite
+# dans /data, pas un service à découvrir). La variante Debian « slim » est
+# choisie parce que better-sqlite3 — utilisé par l'adapter Prisma — a des
+# binaires précompilés pour la glibc, ce qui évite de compiler du natif.
+#
+# Les tags Node sont multi-architecture: le même tag résout vers la bonne image.
+build_from:
+  amd64: node:24-bookworm-slim
+  aarch64: node:24-bookworm-slim

@@ -1,0 +1,25 @@
+# Sans cette exclusion, le `COPY . .` du Dockerfile écraserait les dépendances
+# installées dans l'image par celles de la machine hôte — y compris les binaires
+# natifs compilés pour un autre système.
+node_modules
+.next
+
+# Base et secrets locaux: ne doivent jamais entrer dans une image.
+.env
+.env.*
+*.db
+*.db-journal
+tests
+
+# Outillage de versionnage: sans effet sur l'exécution, hors du contexte.
+# CHANGELOG.md reste versionné dans le dépôt — c'est là que Home Assistant le
+# lit pour la page de l'add-on — mais il n'a rien à faire dans l'image.
+.changeset
+scripts
+CHANGELOG.md
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md

@@ -1,0 +1,167 @@
+// Schéma de l'app de tâches et points pour enfants.
+// Note: SQLite ne supporte pas les `enum` Prisma — les champs d'énumération sont
+// des String, avec les valeurs autorisées définies dans src/lib/constants.ts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// Un enfant de la famille. Pas de PIN individuel: le kiosque est déverrouillé
+/// par un PIN d'accès unique, chaque enfant tape simplement sur sa carte.
+model Child {
+  id        String   @id @default(cuid())
+  name      String
+  avatar    String   @default("🙂")
+  /// Clé de couleur d'accent (voir CHILD_COLORS dans src/lib/constants.ts)
+  color     String   @default("red")
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  assignedTasks Task[]             @relation("AssignedChild")
+  completions   TaskCompletion[]
+  transactions  Transaction[]
+  redemptions   RewardRedemption[]
+  conversions   MoneyConversion[]
+}
+
+/// Réglages globaux (singleton, toujours id = 1).
+model AppSettings {
+  id              Int      @id @default(1)
+  /// PIN d'entrée du kiosque (hash bcrypt)
+  accessPinHash   String
+  /// PIN du mode parent (hash bcrypt)
+  parentPinHash   String
+  /// Combien de points valent 1 dollar
+  pointsPerDollar Int      @default(100)
+  updatedAt       DateTime @updatedAt
+}
+
+/// Une tâche récurrente ou ponctuelle.
+model Task {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+  /// Clé d'icône (voir TASK_ICONS dans src/lib/constants.ts)
+  icon        String  @default("star")
+  /// FAMILY | INDIVIDUAL
+  type        String
+  pointsValue Int
+  /// DAILY | WEEKDAYS | WEEKLY | ONE_TIME
+  recurrence  String
+  /// Pour WEEKDAYS uniquement: jours de la semaine en CSV, 0=dimanche .. 6=samedi
+  weekdays    String?
+  /// Requis seulement pour les tâches INDIVIDUAL
+  assignedChildId String?
+  assignedChild   Child?  @relation("AssignedChild", fields: [assignedChildId], references: [id], onDelete: SetNull)
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  completions TaskCompletion[]
+
+  @@index([active])
+}
+
+/// Une occurrence de tâche accomplie. Représente l'ÉTAT de disponibilité d'une
+/// occurrence (« qui a pris cette tâche pour cette période »), pas l'audit —
+/// l'audit vit dans Transaction, qui est append-only.
+///
+/// La contrainte unique (taskId, periodKey) implémente le « premier arrivé,
+/// premier servi » des tâches familiales: une seule complétion par occurrence.
+/// Annuler une complétion supprime cette ligne (l'occurrence redevient
+/// disponible) et écrit une transaction inverse pour garder la trace.
+model TaskCompletion {
+  id            String   @id @default(cuid())
+  taskId        String
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  childId       String
+  child         Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  /// Identifiant de l'occurrence, dérivé de la récurrence (voir src/lib/tasks/due.ts)
+  periodKey     String
+  pointsAwarded Int
+  completedAt   DateTime @default(now())
+
+  @@unique([taskId, periodKey])
+  @@index([childId, completedAt])
+}
+
+/// Grand livre append-only. Le solde d'un enfant est TOUJOURS dérivé par
+/// SUM(points) — jamais un compteur stocké — pour rester auditable.
+/// `sourceRef` est volontairement une String sans clé étrangère: une ligne du
+/// ledger doit survivre à la suppression de l'objet qui l'a causée.
+model Transaction {
+  id          String   @id @default(cuid())
+  childId     String
+  child       Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  /// EARNED | SPENT_REWARD | CONVERTED_MONEY | MANUAL_ADJUST
+  type        String
+  /// Signé: positif = crédit, négatif = débit
+  points      Int
+  /// TASK | MANUAL | REWARD | CONVERSION
+  source      String
+  sourceRef   String?
+  description String
+  /// CHILD | PARENT
+  createdBy   String   @default("CHILD")
+  createdAt   DateTime @default(now())
+
+  @@index([childId, createdAt])
+}
+
+/// Une récompense achetable avec des points.
+model Reward {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  icon        String   @default("gift")
+  costPoints  Int
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  redemptions RewardRedemption[]
+
+  @@index([active])
+}
+
+/// Demande d'échange de points contre une récompense. Les points sont débités
+/// immédiatement (le solde reste honnête); un refus par le parent les recrédite.
+model RewardRedemption {
+  id          String    @id @default(cuid())
+  childId     String
+  child       Child     @relation(fields: [childId], references: [id], onDelete: Cascade)
+  rewardId    String?
+  reward      Reward?   @relation(fields: [rewardId], references: [id], onDelete: SetNull)
+  /// Copie du nom au moment de la demande (la récompense peut être supprimée ensuite)
+  rewardName  String
+  pointsSpent Int
+  /// PENDING | FULFILLED | REJECTED
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  @@index([status, createdAt])
+}
+
+/// Demande de conversion de points en argent réel. Même logique que les
+/// récompenses: débit immédiat, recrédit si refusé.
+model MoneyConversion {
+  id          String    @id @default(cuid())
+  childId     String
+  child       Child     @relation(fields: [childId], references: [id], onDelete: Cascade)
+  points      Int
+  /// Montant en cents, pour éviter tout arrondi flottant sur de l'argent réel
+  amountCents Int
+  /// PENDING | PAID | REJECTED
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  @@index([status, createdAt])
+}
