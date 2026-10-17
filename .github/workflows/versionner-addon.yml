@@ -1,0 +1,58 @@
+name: Préparer la version de l'add-on
+
+# Les changesets s'accumulent sur main au fil des fusions. Ce workflow tient à
+# jour une pull request « Version de l'add-on » qui les applique: elle monte
+# la version de package.json ET de config.yaml (npm run version) et écrit les
+# entrées de CHANGELOG.md.
+#
+# Fusionner cette pull request est le geste de publication: le push sur main
+# qui en résulte porte une nouvelle version dans config.yaml, et
+# publier-addon.yml pousse alors les images sous ce nouveau tag. Tant qu'elle
+# n'est pas fusionnée, aucune mise à jour n'est proposée dans Home Assistant.
+#
+# Prérequis du dépôt: Settings → Actions → General → « Allow GitHub Actions to
+# create and approve pull requests ».
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "taches-et-points/.changeset/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Pull request de version
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: taches-et-points/package-lock.json
+
+      - name: Installer
+        working-directory: taches-et-points
+        run: npm ci
+
+      - uses: changesets/action@v1
+        with:
+          cwd: taches-et-points
+          # Le lockfile est régénéré ici, sous Linux: il porte la version du
+          # paquet, et le refaire sous Windows retirerait les binaires natifs
+          # Linux dont l'image a besoin.
+          version: sh -c "npm run version && npm install --package-lock-only --ignore-scripts"
+          title: Version de l'add-on
+          commit: Version de l'add-on
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

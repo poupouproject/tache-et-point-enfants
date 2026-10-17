@@ -61,7 +61,7 @@ export function RewardShop({
             Aucune récompense pour l&apos;instant
           </p>
         ) : (
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className="grid gap-3">
             {rewards.map((reward) => {
               const affordable = balance >= reward.costPoints;
 
@@ -90,7 +90,7 @@ export function RewardShop({
                       </span>
 
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-bold text-white">
+                        <span className="line-clamp-2 font-bold break-words text-white">
                           {reward.name}
                         </span>
                         {reward.description && (

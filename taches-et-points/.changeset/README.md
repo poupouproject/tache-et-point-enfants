@@ -49,12 +49,14 @@ Choix du niveau :
 
 ## Publier une version
 
-```bash
-npm run version   # applique les changesets: package.json + config.yaml + CHANGELOG.md
-```
+Rien à lancer à la main: à chaque fusion sur `main`, la CI ouvre ou met à jour
+la pull request **« Version de l'add-on »**, qui applique les changesets en
+attente (`npm run version`: package.json + config.yaml + CHANGELOG.md).
+Fusionner cette pull request publie l'image sous le nouveau tag, et Home
+Assistant propose la mise à jour.
 
-Committer le résultat, puis fusionner sur `main`: la CI publie l'image sous le
-nouveau tag, et Home Assistant propose la mise à jour.
+`npm run version` reste possible en local; régénérer alors le lockfile sous
+Linux (voir `AGENTS.md`), parce qu'il porte lui aussi la version.
 
 Home Assistant ne lit pas `package.json` — la version qui fait foi pour le
 Supervisor est `version:` dans `config.yaml`, et c'est le tag publié sur GHCR.

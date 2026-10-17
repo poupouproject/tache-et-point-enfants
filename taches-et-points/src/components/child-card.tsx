@@ -120,7 +120,9 @@ export function ChildCard({ child }: { child: ChildBoard }) {
                 </span>
 
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-bold text-white">
+                  {/* Deux lignes plutôt qu'une coupée: sur une carte étroite,
+                      « Sortir les pou… » ne dit plus à l'enfant quoi faire. */}
+                  <span className="line-clamp-2 font-bold break-words text-white">
                     {task.title}
                   </span>
 

@@ -17,6 +17,9 @@ jobs:
   changeset:
     name: Un changeset accompagne la branche
     runs-on: ubuntu-24.04
+    # La pull request de version (versionner-addon.yml) consomme les
+    # changesets au lieu d'en ajouter: c'est la seule branche dispensée.
+    if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
 
     steps:
       - uses: actions/checkout@v5

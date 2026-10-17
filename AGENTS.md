@@ -25,6 +25,10 @@ fichier. Voir `taches-et-points/.changeset/README.md`.
 tag GHCR ; `package.json` porte celle que Changesets connaît. `npm run version`
 met les deux à jour ensemble — ne jamais les modifier à la main séparément.
 
+En pratique, personne ne le lance : après chaque fusion sur `main`, la CI tient
+à jour une pull request « Version de l'add-on » qui le fait. La fusionner est
+le geste de publication. Un tag déjà publié n'est jamais réécrit.
+
 ## Après un `npm install` sous Windows ou macOS
 
 Régénérer le lockfile dans un conteneur Linux, sinon le `npm ci` de l'image

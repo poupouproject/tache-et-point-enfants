@@ -8,6 +8,8 @@ Empaquetée comme **add-on Home Assistant**, mais accessible directement par une
 URL locale (`http://<ip-ha>:3000`) sans passer par Home Assistant — pas de
 panneau dans la barre latérale, c'est un NIP qui protège l'accès.
 
+![Tableau de bord familial: une carte par enfant avec son solde, sa série et ses quêtes du jour](docs/captures/tableau.png)
+
 ## Ce que ça fait
 
 - **Tableau de bord familial** — une carte par enfant, avec son solde, sa série
@@ -22,6 +24,19 @@ panneau dans la barre latérale, c'est un NIP qui protège l'accès.
   dollars au taux de votre choix. Les deux passent par une approbation parent.
 - **Espace parents** — protégé par un second NIP: tâches, enfants, récompenses,
   ajustements manuels, approbations et réglages.
+
+### En images
+
+| | |
+|---|---|
+| ![Boutique et historique d'un enfant](docs/captures/boutique.png) | ![Espace parents: soldes, demandes à approuver, ajustements et tâches confirmées](docs/captures/espace-parents.png) |
+| **Page d'un enfant** — boutique, conversion en argent et historique de chaque pièce gagnée ou dépensée. | **Espace parents** — soldes, demandes à approuver, ajustements manuels et annulation d'une tâche confirmée. |
+| ![Liste des tâches dans l'espace parents](docs/captures/taches.png) | ![Écran de NIP](docs/captures/nip.png) |
+| **Tâches** — familiales ou individuelles, avec leur récurrence. | **NIP d'entrée** — un pavé numérique, pensé pour une tablette au mur. |
+
+<p align="center">
+  <img src="docs/captures/mobile.png" alt="Le tableau de bord sur un téléphone" width="300">
+</p>
 
 ## Comment c'est construit
 
@@ -76,7 +91,10 @@ npm test
 Les tests tournent contre une vraie base SQLite jetable et couvrent ce qui doit
 absolument être correct: l'arbitrage des tâches familiales (y compris deux
 confirmations vraiment simultanées), l'annulation par un parent, le calcul des
-récurrences, et l'impossibilité de dépenser deux fois les mêmes pièces.
+récurrences et leur changement en cours de route, l'impossibilité de dépenser
+deux fois les mêmes pièces, les doubles clics d'un parent (un refus ne
+rembourse qu'une fois), l'enfant désactivé, et le frein du NIP face à une
+rafale de tentatives.
 
 ### Après un `npm install` sous Windows ou macOS
 
@@ -115,7 +133,9 @@ Dans l'add-on, ces trois variables sont gérées automatiquement par `run.sh`.
 2. Installer **Quêtes & Pièces** dans la liste, puis démarrer.
 3. Ouvrir `http://<ip-de-home-assistant>:3000` et choisir les deux NIP.
 
-Options de l'add-on : `timezone` (fuseau de la famille) et `log_level`.
+Options de l'add-on : `timezone` (fuseau de la famille, au format
+`America/Montreal`) et `log_level`. Un fuseau inconnu est ignoré au profit de
+`America/Toronto`, avec un avertissement dans le journal de l'add-on.
 
 Pour construire et essayer l'image sans Home Assistant :
 
@@ -131,23 +151,41 @@ Le Supervisor **télécharge** l'image, il ne la construit pas: `config.yaml`
 porte une clé `image:`, et compiler Next.js sur le matériel Home Assistant
 serait long (très long sur un Raspberry Pi).
 
-Les images sont produites par `.github/workflows/publier-addon.yml`, à chaque
-poussée sur `main`, vers `ghcr.io/poupouproject/taches-et-points-{arch}`. Chaque
-architecture est construite sur un runner de la même architecture: émuler l'ARM
-en QEMU multiplierait la durée du build.
+Les images sont produites par `.github/workflows/publier-addon.yml` vers
+`ghcr.io/poupouproject/taches-et-points-{arch}`. Chaque architecture est
+construite sur un runner de la même architecture: émuler l'ARM en QEMU
+multiplierait la durée du build. Avant toute publication, l'image est démarrée
+et doit répondre; une image qui ne démarre pas n'atteint jamais GHCR. Sur une
+pull request, l'image est construite et testée, sans être publiée.
+
+**Un tag de version publié ne se réécrit jamais.** Si `main` reçoit du code
+sans que la version de `config.yaml` change, rien n'est poussé: les
+installations existantes recevraient sinon d'autres binaires sans que Home
+Assistant affiche de mise à jour.
 
 **Pour livrer une mise à jour**, le versionnage passe par
 [Changesets](https://github.com/changesets/changesets) :
 
-```bash
-cd taches-et-points
-npm run changeset   # décrire le changement, choisir patch / minor / major
-# ... committer le fichier créé dans .changeset/ avec le changement ...
-npm run version     # bump package.json + config.yaml + CHANGELOG.md
-```
+1. Chaque branche décrit son changement :
+
+   ```bash
+   cd taches-et-points
+   npx changeset       # décrire le changement, choisir patch / minor / major
+   ```
+
+   et committe le fichier créé dans `.changeset/` avec le reste.
+2. À la fusion sur `main`, `.github/workflows/versionner-addon.yml` ouvre (ou
+   met à jour) une pull request **« Version de l'add-on »**. Elle applique les
+   changesets en attente: nouvelle version dans `package.json` et
+   `config.yaml`, nouvelles entrées dans `CHANGELOG.md`.
+3. **Fusionner cette pull request publie la version**: le push qui en résulte
+   porte un nouveau numéro dans `config.yaml`, les images sont poussées sous ce
+   tag, et Home Assistant propose la mise à jour.
+
+`npm run version` fait la même chose à la main, si besoin.
 
 **Toute branche qui touche à `taches-et-points/` doit ajouter un changeset**, et
-la CI le vérifie. Ce n'est pas de la bureaucratie: le texte du changeset devient
+la CI le vérifie (seule la pull request de version en est dispensée). Ce n'est pas de la bureaucratie: le texte du changeset devient
 une entrée de `taches-et-points/CHANGELOG.md`, que Home Assistant affiche sur la
 page de l'add-on. C'est ce qu'un parent lit pour décider s'il met à jour, donc
 l'entrée se rédige dans ses mots — voir `taches-et-points/.changeset/README.md`.
@@ -156,6 +194,15 @@ Pour un changement sans effet visible: `npx changeset add --empty`.
 `config.yaml` est le seul numéro que le Supervisor lit (c'est le tag GHCR
 publié, et ce qui déclenche le bouton « Mettre à jour »). `npm run version` le
 tient synchronisé avec `package.json`, il n'y a donc qu'un numéro à gérer.
+
+**Réglages du dépôt GitHub** nécessaires :
+
+- *Settings → Actions → General → Workflow permissions* : cocher **« Allow
+  GitHub Actions to create and approve pull requests »**, sans quoi la pull
+  request de version ne peut pas être ouverte.
+- *Settings → Branches* (dépôt public ou GitHub Pro) : protéger `main` en
+  exigeant le contrôle **« Un changeset accompagne la branche »** et les deux
+  builds `amd64` / `aarch64`.
 
 **Au tout premier passage**, rendre les deux paquets GHCR publics (Profil
 GitHub → Packages → `taches-et-points-amd64` puis `-aarch64` → Package settings
@@ -179,6 +226,8 @@ télécharger: il n'est pas authentifié auprès de GHCR.
 
 ```
 repository.yaml            Déclare le dépôt comme boutique d'add-ons HA
+.github/workflows/         Publication des images, PR de version, contrôle du changeset
+docs/captures/             Captures d'écran du README
 taches-et-points/          L'add-on (= le contexte de build Docker)
   config.yaml              Manifeste: port direct, pas d'ingress, /data
   build.yaml               Images de base par architecture
