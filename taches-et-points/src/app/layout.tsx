@@ -21,12 +21,26 @@ const rubik = Rubik({
 export const metadata: Metadata = {
   title: "Quêtes & Pièces",
   description: "Les tâches et les points de la famille",
+  applicationName: "Quêtes & Pièces",
+  // iPhone et iPad ne lisent pas le manifeste pour l'écran d'accueil: ils ont
+  // leurs propres balises.
+  appleWebApp: {
+    capable: true,
+    title: "Quêtes",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: [{ url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 export const viewport: Viewport = {
   themeColor: "#0b1020",
   // Écran de kiosque tactile: on évite le zoom accidentel à deux doigts.
   maximumScale: 1,
+  // En plein écran, le contenu peut passer sous l'encoche ou les coins arrondis.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -26,6 +26,8 @@ export type ChildBoard = {
   balance: number;
   streak: number;
   tasks: DueTask[];
+  /** Tâches individuelles encore à faire aujourd'hui: ce que l'enfant DOIT faire. */
+  remaining: number;
   doneToday: { title: string; points: number }[];
 };
 
@@ -130,9 +132,26 @@ export async function buildBoard(now: Date = new Date()): Promise<ChildBoard[]> 
       balance: balances.get(child.id) ?? 0,
       streak: streaks.get(child.id) ?? 0,
       tasks: dueTasks,
+      remaining: dueTasks.filter((task) => task.type === "INDIVIDUAL").length,
       doneToday,
     };
   });
+}
+
+/**
+ * Tâches familiales encore libres, pour le compteur du tableau de bord.
+ *
+ * Une tâche familiale disponible figure dans la liste de chaque enfant: on la
+ * compte une seule fois, par identifiant.
+ */
+export function familyRemaining(board: ChildBoard[]): number {
+  const ids = new Set<string>();
+  for (const child of board) {
+    for (const task of child.tasks) {
+      if (task.type === "FAMILY") ids.add(task.id);
+    }
+  }
+  return ids.size;
 }
 
 /**

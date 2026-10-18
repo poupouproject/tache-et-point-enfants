@@ -3,23 +3,8 @@
 import { useActionState, useState } from "react";
 
 import { saveChild, type FormState } from "@/app/parent/actions";
-import { CHILD_COLOR_KEYS, childColor } from "@/lib/constants";
+import { AVATARS, CHILD_COLOR_KEYS, childColor } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-
-const AVATARS = [
-  "🦊",
-  "🐢",
-  "🐼",
-  "🦁",
-  "🐸",
-  "🦄",
-  "🐧",
-  "🐙",
-  "🦖",
-  "🐨",
-  "🐰",
-  "🦉",
-];
 
 export function ChildForm({
   child,

@@ -126,3 +126,14 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   FAMILY: "Familiale",
   INDIVIDUAL: "Individuelle",
 };
+
+/**
+ * Avatars proposés. L'enfant choisit le sien sur sa page de profil: la liste
+ * fait aussi autorité côté serveur, pour qu'un POST direct ne puisse pas
+ * glisser n'importe quel texte à la place d'un avatar.
+ */
+export const AVATARS = [
+  "🦊", "🐢", "🐼", "🦁", "🐸", "🦄", "🐧", "🐙",
+  "🦖", "🐨", "🐰", "🦉", "🐯", "🐶", "🐱", "🐵",
+  "🦈", "🐲", "🦋", "🐝", "🚀", "⚽", "🎮", "🎨",
+] as const;

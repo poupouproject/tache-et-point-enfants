@@ -10,20 +10,28 @@ Empaquetée comme **add-on Home Assistant**, mais accessible directement par une
 URL locale (`http://<ip-ha>:3000`) sans passer par Home Assistant — pas de
 panneau dans la barre latérale, c'est un NIP qui protège l'accès.
 
-![Tableau de bord familial: une carte par enfant avec son solde, sa série et ses quêtes du jour](docs/captures/tableau.png)
+![Tableau de bord familial: une carte par enfant avec son solde, ce qui lui reste à faire et trois gros boutons](docs/captures/tableau.png)
 
 ## Ce que ça fait
 
-- **Tableau de bord familial** — une carte par enfant, avec son solde, sa série
-  de jours consécutifs et ses quêtes du jour. Tout tient sur un écran.
-- **Deux sortes de tâches** — *familiales* (n'importe qui peut la prendre,
-  premier arrivé premier servi) et *individuelles* (assignées à un enfant).
+- **Tableau de bord familial** — une carte par enfant: son solde, sa série de
+  jours consécutifs, le nombre de tâches qui lui restent, et trois boutons
+  (*J'ai fait une tâche*, *Dépenser*, *Historique*). Les cartes s'ajustent à
+  l'écran: trois côte à côte sur une tablette à l'horizontale, sans défiler.
+- **Confirmer une tâche** — une fenêtre liste ce que l'enfant peut confirmer.
+  Un tap affiche un « Bravo ! » et les pièces s'envolent vers son solde.
+- **Deux sortes de tâches** — *individuelles* (assignées à un enfant, comptées
+  sur sa carte) et *familiales* (au choix: la première personne qui la fait
+  gagne les pièces; leur nombre s'affiche en haut du tableau).
 - **Récurrences** — tous les jours, certains jours de la semaine, une fois par
   semaine, ou une seule fois. Aucune tâche à réinitialiser à la main.
 - **Confiance par défaut** — confirmer une tâche crédite les pièces tout de
   suite; un parent peut annuler après coup.
 - **Boutique et argent** — récompenses achetables en pièces, et conversion en
   dollars au taux de votre choix. Les deux passent par une approbation parent.
+- **Ma carte** — chaque enfant choisit lui-même son avatar et sa couleur.
+- **Installable** — l'app se pose sur l'écran d'accueil d'une tablette et
+  s'ouvre en plein écran (voir *Installer sur une tablette*).
 - **Espace parents** — protégé par un second NIP: tâches, enfants, récompenses,
   ajustements manuels, approbations et réglages.
 
@@ -31,14 +39,36 @@ panneau dans la barre latérale, c'est un NIP qui protège l'accès.
 
 | | |
 |---|---|
-| ![Boutique et historique d'un enfant](docs/captures/boutique.png) | ![Espace parents: soldes, demandes à approuver, ajustements et tâches confirmées](docs/captures/espace-parents.png) |
-| **Page d'un enfant** — boutique, conversion en argent et historique de chaque pièce gagnée ou dépensée. | **Espace parents** — soldes, demandes à approuver, ajustements manuels et annulation d'une tâche confirmée. |
-| ![Liste des tâches dans l'espace parents](docs/captures/taches.png) | ![Écran de NIP](docs/captures/nip.png) |
-| **Tâches** — familiales ou individuelles, avec leur récurrence. | **NIP d'entrée** — un pavé numérique, pensé pour une tablette au mur. |
+| ![Fenêtre « Qu'est-ce que tu as fait ? »: les tâches de l'enfant, puis celles au choix](docs/captures/fenetre-taches.png) | ![« Super ! » après une tâche confirmée](docs/captures/bravo.png) |
+| **J'ai fait une tâche** — ses tâches d'abord, puis celles au choix pour la famille. | **Bravo !** — puis les pièces volent jusqu'au solde. |
+| ![Boutique et conversion en argent](docs/captures/boutique.png) | ![Page « Ma carte »: choix de l'avatar et de la couleur](docs/captures/profil.png) |
+| **Dépenser** — récompenses et conversion en argent, approuvées par un parent. | **Ma carte** — l'enfant choisit son avatar et sa couleur. |
+| ![Espace parents: soldes, demandes à approuver, ajustements et tâches confirmées](docs/captures/espace-parents.png) | ![Écran de NIP](docs/captures/nip.png) |
+| **Espace parents** — soldes, demandes à approuver, ajustements manuels et annulation d'une tâche confirmée. | **NIP d'entrée** — un pavé numérique, pensé pour une tablette au mur. |
 
 <p align="center">
   <img src="docs/captures/mobile.png" alt="Le tableau de bord sur un téléphone" width="300">
 </p>
+
+## Installer sur une tablette
+
+L'app a un manifeste d'application web: un navigateur peut l'installer comme
+une vraie application, avec son icône dans le menu, et elle s'ouvre alors en
+plein écran.
+
+**Les navigateurs n'installent une application que depuis une adresse sûre**
+(HTTPS, ou `localhost`). Servie en HTTP sur le réseau local
+(`http://<ip-ha>:3000`), Chrome refuse l'installation. Deux façons de faire:
+
+- **Sur la tablette de la maison (le plus simple)** — dans Chrome, ouvrir
+  `chrome://flags/#unsafely-treat-insecure-origin-as-secure`, y inscrire
+  `http://<ip-ha>:3000`, activer, relancer Chrome. Ouvrir l'app, puis
+  *⋮ → Installer l'application*. Le réglage ne vaut que pour cette adresse et
+  ce navigateur.
+- **Pour tous les appareils** — servir l'app en HTTPS, par exemple derrière le
+  proxy NGINX de Home Assistant avec un certificat.
+
+Sans installation, le bouton ⛶ du tableau de bord passe en plein écran.
 
 ## Comment c'est construit
 
@@ -242,6 +272,7 @@ taches-et-points/          L'add-on (= le contexte de build Docker)
   Dockerfile               Build Next.js multi-étapes
   run.sh                   Démarrage: fuseau, secret, migrations, serveur
   prisma/schema.prisma     Modèle de données
+  public/icons/            Icônes de l'app installée sur une tablette
   src/lib/                 Logique métier (ledger, récurrences, session)
   src/app/                 Pages et Server Actions
   tests/                   Tests de la logique métier
