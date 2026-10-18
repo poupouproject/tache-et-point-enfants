@@ -1,6 +1,6 @@
 {
   "name": "tache-et-point-enfants",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
