@@ -3,7 +3,7 @@ name: Quêtes & Pièces
 version: "1.0.1"
 slug: taches-et-points
 description: >-
-  Tâches et points pour les enfants, avec récompenses et conversion en argent.
+  Tâches et points pour les enfants, avec récompenses et conversion en argent
 url: https://github.com/poupouproject/tache-et-point-enfants
 arch:
   - amd64
@@ -37,7 +37,5 @@ map:
 
 options:
   timezone: America/Toronto
-  log_level: info
 schema:
   timezone: str
-  log_level: list(trace|debug|info|notice|warning|error|fatal)

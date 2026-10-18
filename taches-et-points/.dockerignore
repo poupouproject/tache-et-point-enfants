@@ -18,6 +18,11 @@ tests
 scripts
 CHANGELOG.md
 
+# Fiche de l'add-on dans Home Assistant: lue dans le dépôt, pas dans l'image.
+DOCS.md
+icon.png
+logo.png
+
 .git
 .gitignore
 Dockerfile
