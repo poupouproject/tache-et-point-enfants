@@ -52,6 +52,13 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000
 
+# Prisma lance `openssl version` pour choisir son moteur. L'image slim a la
+# bibliothèque mais pas la commande: Prisma retombe alors sur openssl-1.1.x et
+# remplit le journal de l'add-on d'avertissements à chaque démarrage.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 # La sortie autonome embarque son propre serveur et les seuls modules utiles.
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static

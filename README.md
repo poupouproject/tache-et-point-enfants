@@ -1,3 +1,5 @@
+<p align="center"><img src="taches-et-points/logo.png" alt="Quêtes & Pièces" width="250"></p>
+
 # Quêtes & Pièces
 
 Application de tâches et de points pour les enfants, à héberger à la maison.
@@ -133,9 +135,13 @@ Dans l'add-on, ces trois variables sont gérées automatiquement par `run.sh`.
 2. Installer **Quêtes & Pièces** dans la liste, puis démarrer.
 3. Ouvrir `http://<ip-de-home-assistant>:3000` et choisir les deux NIP.
 
-Options de l'add-on : `timezone` (fuseau de la famille, au format
-`America/Montreal`) et `log_level`. Un fuseau inconnu est ignoré au profit de
+Option de l'add-on : `timezone` (fuseau de la famille, au format
+`America/Montreal`). Un fuseau inconnu est ignoré au profit de
 `America/Toronto`, avec un avertissement dans le journal de l'add-on.
+
+La fiche de l'add-on dans Home Assistant (onglet Documentation) vient de
+`taches-et-points/DOCS.md`, écrite pour un parent. L'icône et le logo de la
+boutique sont `icon.png` et `logo.png` dans le même dossier.
 
 Pour construire et essayer l'image sans Home Assistant :
 
@@ -230,6 +236,8 @@ repository.yaml            Déclare le dépôt comme boutique d'add-ons HA
 docs/captures/             Captures d'écran du README
 taches-et-points/          L'add-on (= le contexte de build Docker)
   config.yaml              Manifeste: port direct, pas d'ingress, /data
+  DOCS.md                  Fiche « Documentation » de l'add-on dans Home Assistant
+  icon.png, logo.png       Icône et logo de la boutique d'applications
   build.yaml               Images de base par architecture
   Dockerfile               Build Next.js multi-étapes
   run.sh                   Démarrage: fuseau, secret, migrations, serveur
