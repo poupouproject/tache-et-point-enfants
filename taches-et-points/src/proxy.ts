@@ -29,6 +29,10 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // On laisse passer les assets et les routes internes de Next.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|ico)$).*)"],
+  // On laisse passer les assets et les routes internes de Next, et le
+  // manifeste: le navigateur le télécharge sans cookie pour proposer
+  // d'installer l'app, avant toute saisie de NIP.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|ico)$).*)",
+  ],
 };

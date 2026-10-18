@@ -7,15 +7,30 @@ récompense ou conversion.
 
 ## Ouvrir l'application
 
-L'application ne s'affiche pas dans la barre latérale de Home Assistant. Elle
-s'ouvre directement dans un navigateur, à l'adresse :
+L'application ne s'affiche pas dans la barre latérale de Home Assistant. Le
+bouton **Ouvrir l'interface web**, en haut de cette page, l'ouvre dans un
+navigateur. Son adresse :
 
 ```
 http://<adresse-de-home-assistant>:3000
 ```
 
-Sur une tablette, ajoutez cette page à l'écran d'accueil pour l'ouvrir d'un
-geste.
+## L'installer sur une tablette
+
+L'application peut s'installer comme une vraie application, avec son icône,
+et s'ouvre alors en plein écran. Les navigateurs ne le permettent toutefois que
+pour une adresse sûre (HTTPS), ce que n'est pas l'adresse locale ci-dessus.
+
+Sur une tablette Android, avec Chrome :
+
+1. Ouvrir `chrome://flags/#unsafely-treat-insecure-origin-as-secure`.
+2. Inscrire l'adresse de l'application (par exemple
+   `http://192.168.1.10:3000`), passer le réglage à *Enabled*, puis toucher
+   *Relaunch*.
+3. Ouvrir l'application, puis *⋮ → Installer l'application*.
+
+Sans installation, le bouton ⛶ en haut du tableau de bord passe en plein
+écran.
 
 ## Première visite
 

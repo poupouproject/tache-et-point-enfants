@@ -28,6 +28,7 @@ type Mods = {
   due: typeof import("../src/lib/tasks/due");
   rewards: typeof import("../src/lib/rewards/service");
   time: typeof import("../src/lib/time");
+  children: typeof import("../src/lib/children");
 };
 
 let m: Mods;
@@ -53,6 +54,7 @@ before(async () => {
     due: await import("../src/lib/tasks/due"),
     rewards: await import("../src/lib/rewards/service"),
     time: await import("../src/lib/time"),
+    children: await import("../src/lib/children"),
   };
 });
 
@@ -760,5 +762,72 @@ describe("frein du NIP", () => {
 
     throttle.recordSuccess(key);
     assert.equal(throttle.reserveAttempt(key), 0, "un succès efface l'ardoise");
+  });
+});
+
+describe("compteurs du tableau de bord", () => {
+  it("compte les tâches individuelles qui restent à chaque enfant", async () => {
+    const { alex, sam } = await makeKids();
+    for (const title of ["Faire son lit", "Ranger sa chambre"]) {
+      await m.prisma.task.create({
+        data: { title, type: "INDIVIDUAL", pointsValue: 1, recurrence: "DAILY", assignedChildId: alex.id },
+      });
+    }
+    const lit = await m.prisma.task.findFirstOrThrow({ where: { title: "Faire son lit" } });
+    await m.tasks.completeTask(lit.id, alex.id);
+
+    const board = await m.tasks.buildBoard();
+    assert.equal(board.find((c) => c.id === alex.id)!.remaining, 1);
+    assert.equal(board.find((c) => c.id === sam.id)!.remaining, 0);
+  });
+
+  it("compte une seule fois chaque tâche familiale encore libre", async () => {
+    const { alex } = await makeKids();
+    for (const title of ["Vider le lave-vaisselle", "Mettre la table"]) {
+      await m.prisma.task.create({
+        data: { title, type: "FAMILY", pointsValue: 2, recurrence: "DAILY" },
+      });
+    }
+
+    let board = await m.tasks.buildBoard();
+    assert.equal(m.tasks.familyRemaining(board), 2, "deux tâches, deux enfants: 2, pas 4");
+
+    const table = await m.prisma.task.findFirstOrThrow({ where: { title: "Mettre la table" } });
+    await m.tasks.completeTask(table.id, alex.id);
+
+    board = await m.tasks.buildBoard();
+    assert.equal(m.tasks.familyRemaining(board), 1);
+    assert.equal(board.find((c) => c.id === alex.id)!.remaining, 0, "une tâche familiale n'est pas imposée");
+  });
+});
+
+describe("profil d'un enfant", () => {
+  it("change l'avatar et la couleur", async () => {
+    const { alex } = await makeKids();
+
+    const result = await m.children.updateChildProfile(alex.id, "🐲", "purple");
+
+    assert.equal(result.ok, true);
+    const updated = await m.prisma.child.findUniqueOrThrow({ where: { id: alex.id } });
+    assert.equal(updated.avatar, "🐲");
+    assert.equal(updated.color, "purple");
+  });
+
+  it("refuse un avatar ou une couleur hors des listes", async () => {
+    const { alex } = await makeKids();
+
+    assert.equal((await m.children.updateChildProfile(alex.id, "<b>moi</b>", "purple")).ok, false);
+    assert.equal((await m.children.updateChildProfile(alex.id, "🐲", "fuchsia")).ok, false);
+
+    const unchanged = await m.prisma.child.findUniqueOrThrow({ where: { id: alex.id } });
+    assert.equal(unchanged.avatar, "🦊");
+  });
+
+  it("ne touche pas à un enfant masqué", async () => {
+    const { alex } = await makeKids();
+    await m.prisma.child.update({ where: { id: alex.id }, data: { active: false } });
+
+    const result = await m.children.updateChildProfile(alex.id, "🐲", "purple");
+    assert.equal(result.ok, false);
   });
 });

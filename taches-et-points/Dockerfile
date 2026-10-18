@@ -62,6 +62,8 @@ RUN apt-get update \
 # La sortie autonome embarque son propre serveur et les seuls modules utiles.
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+# Icônes de l'app installée: la sortie autonome ne copie pas public/.
+COPY --from=builder /app/public ./public
 
 # Nécessaires aux migrations au démarrage. La destination se termine par
 # `node_modules` parce que c'est ce segment que Node cherche en remontant les

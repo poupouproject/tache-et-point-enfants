@@ -24,6 +24,10 @@ init: true
 # Assistant ni apparaître dans la barre latérale. C'est le NIP de l'app qui
 # protège l'accès.
 ingress: false
+# Bouton « Ouvrir l'interface web » sur la page de l'add-on: le Supervisor
+# remplace [HOST] par l'adresse de Home Assistant et [PORT:3000] par le port
+# réellement publié, même si un parent l'a changé dans la configuration.
+webui: http://[HOST]:[PORT:3000]/
 ports:
   3000/tcp: 3000
 ports_description:

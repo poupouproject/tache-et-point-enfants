@@ -83,16 +83,7 @@ export async function spendPoints(
   return { ok: true };
 }
 
-/** Convertit des points en cents, au taux configuré. */
-export function pointsToCents(points: number, pointsPerDollar: number): number {
-  if (pointsPerDollar <= 0) return 0;
-  return Math.round((points / pointsPerDollar) * 100);
-}
-
-/** Formate un montant en cents, ex. 1250 -> « 12,50 $ ». */
-export function formatMoney(cents: number): string {
-  return new Intl.NumberFormat("fr-CA", {
-    style: "currency",
-    currency: "CAD",
-  }).format(cents / 100);
-}
+// Les conversions d'argent vivent dans un module sans Prisma, pour que les
+// composants du navigateur puissent s'en servir; ré-exportées ici pour le code
+// serveur qui les importait déjà depuis le grand livre.
+export { formatMoney, pointsToCents } from "@/lib/money";
