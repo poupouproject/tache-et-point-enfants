@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Press_Start_2P, Rubik } from "next/font/google";
 
+import { VersionWatch } from "@/components/version-watch";
+
 import "./globals.css";
 
 // Police pixel réservée aux titres et aux compteurs (effet HUD): illisible en
@@ -49,7 +51,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="fr"
       className={`${pressStart.variable} ${rubik.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        <VersionWatch />
+      </body>
     </html>
   );
 }
