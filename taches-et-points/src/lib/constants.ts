@@ -5,7 +5,13 @@
  * des String et c'est ce fichier qui fait autorité sur les valeurs permises.
  */
 
-export const TASK_TYPES = ["FAMILY", "INDIVIDUAL"] as const;
+/**
+ * FAMILY: une seule occurrence pour toute la famille, au premier arrivé.
+ * INDIVIDUAL: assignée à un enfant.
+ * EACH: chaque enfant a la sienne (faire son lit), sans en créer une copie par
+ * enfant.
+ */
+export const TASK_TYPES = ["FAMILY", "INDIVIDUAL", "EACH"] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
 
 export const RECURRENCES = ["DAILY", "WEEKDAYS", "WEEKLY", "ONE_TIME"] as const;
@@ -125,6 +131,7 @@ export const RECURRENCE_LABELS: Record<Recurrence, string> = {
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   FAMILY: "Familiale",
   INDIVIDUAL: "Individuelle",
+  EACH: "Chaque enfant",
 };
 
 /**

@@ -246,6 +246,8 @@ export async function saveReward(
     if (updated.count === 0) {
       return { error: "Cette récompense n'existe plus." };
     }
+    revalidateAll();
+    redirect("/parent/recompenses");
   } else {
     const count = await prisma.reward.count();
     await prisma.reward.create({ data: { ...data, sortOrder: count } });

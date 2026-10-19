@@ -147,7 +147,9 @@ export function TaskForm({
           <p className="mt-2 text-xs text-hud-400">
             {type === "FAMILY"
               ? "Tout le monde la voit, le premier qui la fait gagne les pièces."
-              : "Assignée à un seul enfant."}
+              : type === "EACH"
+                ? "Chaque enfant a la sienne et gagne ses pièces (ex. faire son lit)."
+                : "Assignée à un seul enfant."}
           </p>
         </div>
       </div>

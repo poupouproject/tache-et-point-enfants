@@ -20,8 +20,9 @@ panneau dans la barre latérale, c'est un NIP qui protège l'accès.
   l'écran: trois côte à côte sur une tablette à l'horizontale, sans défiler.
 - **Confirmer une tâche** — une fenêtre liste ce que l'enfant peut confirmer.
   Un tap affiche un « Bravo ! » et les pièces s'envolent vers son solde.
-- **Deux sortes de tâches** — *individuelles* (assignées à un enfant, comptées
-  sur sa carte) et *familiales* (au choix: la première personne qui la fait
+- **Trois sortes de tâches** — *individuelles* (assignées à un enfant),
+  *chaque enfant* (chacun fait la sienne: faire son lit), toutes deux comptées
+  sur la carte, et *familiales* (au choix: la première personne qui la fait
   gagne les pièces; leur nombre s'affiche en haut du tableau).
 - **Récurrences** — tous les jours, certains jours de la semaine, une fois par
   semaine, ou une seule fois. Aucune tâche à réinitialiser à la main.

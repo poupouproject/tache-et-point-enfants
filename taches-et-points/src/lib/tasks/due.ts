@@ -71,6 +71,23 @@ export function isDueNow(
   return days.includes(localParts(now).weekday);
 }
 
+/**
+ * Clé d'occurrence telle qu'elle est enregistrée sur une complétion.
+ *
+ * Pour une tâche « chaque enfant », chaque enfant a sa propre occurrence: la
+ * clé porte son identifiant. La contrainte unique (taskId, periodKey) arbitre
+ * alors par enfant, comme elle arbitre la famille entière pour une tâche
+ * familiale.
+ */
+export function occurrenceKey(
+  task: { type: string; recurrence: string },
+  childId: string,
+  at: Date = new Date(),
+): string {
+  const period = periodKeyFor(task.recurrence, at);
+  return task.type === "EACH" ? `${period}~${childId}` : period;
+}
+
 /** Résumé lisible de la récurrence, pour l'UI. */
 export function describeRecurrence(task: TaskRecurrenceInput): string {
   const labels = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];

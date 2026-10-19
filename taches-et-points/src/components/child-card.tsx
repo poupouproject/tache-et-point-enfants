@@ -192,7 +192,7 @@ function TaskPicker({
   const [cheer, setCheer] = useState<{ text: string; points: number; title: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const own = child.tasks.filter((task) => task.type === "INDIVIDUAL");
+  const own = child.tasks.filter((task) => task.type !== "FAMILY");
   const shared = child.tasks.filter((task) => task.type === "FAMILY");
 
   function confirm(task: DueTask, button: HTMLButtonElement) {

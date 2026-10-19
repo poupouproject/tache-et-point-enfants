@@ -3,7 +3,7 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { balancesByChild, recordTransaction } from "@/lib/ledger";
-import { isDueNow, periodKeyFor } from "@/lib/tasks/due";
+import { isDueNow, occurrenceKey } from "@/lib/tasks/due";
 import { dateKeyOf, shiftDateKey, localParts } from "@/lib/time";
 
 export type DueTask = {
@@ -56,7 +56,15 @@ export async function buildBoard(now: Date = new Date()): Promise<ChildBoard[]> 
   const completions = await prisma.taskCompletion.findMany({
     where: {
       taskId: { in: tasks.map((task) => task.id) },
-      periodKey: { in: [...new Set(tasks.map((t) => periodKeyFor(t.recurrence, now)))] },
+      periodKey: {
+        in: [
+          ...new Set(
+            tasks.flatMap((task) =>
+              children.map((child) => occurrenceKey(task, child.id, now)),
+            ),
+          ),
+        ],
+      },
     },
     include: { child: { select: { name: true } } },
   });
@@ -97,7 +105,7 @@ export async function buildBoard(now: Date = new Date()): Promise<ChildBoard[]> 
         continue;
       }
 
-      const periodKey = periodKeyFor(task.recurrence, now);
+      const periodKey = occurrenceKey(task, child.id, now);
       if (taken.has(takenKey(task.id, periodKey))) continue;
 
       dueTasks.push({
@@ -132,7 +140,8 @@ export async function buildBoard(now: Date = new Date()): Promise<ChildBoard[]> 
       balance: balances.get(child.id) ?? 0,
       streak: streaks.get(child.id) ?? 0,
       tasks: dueTasks,
-      remaining: dueTasks.filter((task) => task.type === "INDIVIDUAL").length,
+      // Ce qui est imposé à l'enfant: ses tâches et celles de chaque enfant.
+      remaining: dueTasks.filter((task) => task.type !== "FAMILY").length,
       doneToday,
     };
   });
@@ -250,7 +259,7 @@ export async function completeTask(
     return { ok: false, reason: "NOT_AVAILABLE" };
   }
 
-  const periodKey = periodKeyFor(task.recurrence, now);
+  const periodKey = occurrenceKey(task, childId, now);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -338,8 +347,15 @@ export async function updateTask(
 
     await tx.task.update({ where: { id: taskId }, data });
 
-    if (existing.recurrence !== data.recurrence) {
-      await remapCompletionPeriods(tx, taskId, data.recurrence);
+    // La clé dépend de la récurrence, et du type quand on passe à « chaque
+    // enfant » ou qu'on le quitte (la clé porte alors l'enfant).
+    const type = typeof data.type === "string" ? data.type : existing.type;
+    const perChild = (value: string) => value === "EACH";
+    if (
+      existing.recurrence !== data.recurrence ||
+      perChild(existing.type) !== perChild(type)
+    ) {
+      await remapCompletionPeriods(tx, taskId, { type, recurrence: data.recurrence });
     }
 
     return true;
@@ -350,7 +366,8 @@ export async function updateTask(
 const ARCHIVED_PERIOD_PREFIX = "archive:";
 
 /**
- * Réécrit les clés d'occurrence après un changement de récurrence.
+ * Réécrit les clés d'occurrence après un changement de récurrence, ou de type
+ * vers ou depuis « chaque enfant ».
  *
  * La `periodKey` dérive de la récurrence: passer une tâche de quotidienne à
  * hebdomadaire change la forme de la clé, et les complétions existantes ne
@@ -370,7 +387,7 @@ const ARCHIVED_PERIOD_PREFIX = "archive:";
 export async function remapCompletionPeriods(
   tx: Prisma.TransactionClient,
   taskId: string,
-  newRecurrence: string,
+  task: { type: string; recurrence: string },
 ): Promise<void> {
   const completions = await tx.taskCompletion.findMany({
     where: { taskId },
@@ -385,7 +402,7 @@ export async function remapCompletionPeriods(
   // Les complétions sont triées de la plus récente à la plus ancienne: la
   // première rencontrée pour une clé est donc celle qui la prend.
   for (const completion of completions) {
-    const key = periodKeyFor(newRecurrence, completion.completedAt);
+    const key = occurrenceKey(task, completion.childId, completion.completedAt);
     if (claimed.has(key)) {
       targets.set(completion.id, `${ARCHIVED_PERIOD_PREFIX}${completion.id}`);
     } else {
