@@ -11,7 +11,7 @@ import { SESSION_COOKIE } from "@/lib/auth/session";
  * dans chaque page et chaque Server Action.
  */
 /** Chemins accessibles sans session (écran de NIP et première configuration). */
-const PUBLIC_PATHS = ["/login", "/bienvenue"];
+const PUBLIC_PATHS = ["/login", "/bienvenue", "/version"];
 
 export function proxy(request: NextRequest) {
   const hasSession = request.cookies.has(SESSION_COOKIE);

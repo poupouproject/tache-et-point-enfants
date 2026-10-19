@@ -14,6 +14,7 @@ import { childColor } from "@/lib/constants";
 import { formatMoney } from "@/lib/money";
 import type { ChildBoard, DueTask } from "@/lib/tasks/service";
 import { cn } from "@/lib/utils";
+import { reloadOnce } from "@/lib/reload";
 
 export type Reward = {
   id: string;
@@ -205,7 +206,18 @@ function TaskPicker({
       formData.set("taskId", task.id);
       formData.set("childId", child.id);
 
-      const result = await confirmTask({ status: "idle" }, formData);
+      let result: Awaited<ReturnType<typeof confirmTask>>;
+      try {
+        result = await confirmTask({ status: "idle" }, formData);
+      } catch {
+        // Presque toujours une page chargée avant une mise à jour de l'app:
+        // le serveur ne reconnaît plus l'action. Rien n'a été enregistré,
+        // la page se recharge avec la nouvelle version.
+        onFail();
+        setError("L'application vient d'être mise à jour, un instant…");
+        reloadOnce();
+        return;
+      }
 
       if (result.status !== "done") {
         onFail();
