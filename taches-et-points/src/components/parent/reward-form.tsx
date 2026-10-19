@@ -6,15 +6,25 @@ import { saveReward, type FormState } from "@/app/parent/actions";
 import { REWARD_ICON_KEYS, TaskIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
-export function RewardForm() {
+type RewardDefaults = {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string;
+  costPoints: number;
+};
+
+/** Ajout d'une récompense, ou modification quand `reward` est fourni. */
+export function RewardForm({ reward }: { reward?: RewardDefaults }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(
     saveReward,
     {},
   );
-  const [icon, setIcon] = useState("gift");
+  const [icon, setIcon] = useState(reward?.icon ?? "gift");
 
   return (
     <form action={formAction} className="panel space-y-5 p-5">
+      {reward && <input type="hidden" name="id" value={reward.id} />}
       <input type="hidden" name="icon" value={icon} />
 
       <div>
@@ -26,6 +36,7 @@ export function RewardForm() {
           name="name"
           required
           maxLength={80}
+          defaultValue={reward?.name}
           placeholder="Ex. 30 min de jeu vidéo"
           className="field"
         />
@@ -39,6 +50,7 @@ export function RewardForm() {
           id="reward-description"
           name="description"
           maxLength={200}
+          defaultValue={reward?.description ?? undefined}
           className="field"
         />
       </div>
@@ -76,7 +88,7 @@ export function RewardForm() {
           type="number"
           min={1}
           required
-          defaultValue={50}
+          defaultValue={reward?.costPoints ?? 50}
           className="field"
         />
       </div>
@@ -93,7 +105,7 @@ export function RewardForm() {
       )}
 
       <button type="submit" disabled={pending} className="btn-primary w-full">
-        Ajouter la récompense
+        {reward ? "Enregistrer" : "Ajouter la récompense"}
       </button>
     </form>
   );

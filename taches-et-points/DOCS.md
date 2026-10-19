@@ -53,6 +53,9 @@ et les récompenses.
   les autres.
 - **Les tâches individuelles** n'apparaissent que chez l'enfant à qui elles sont
   assignées.
+- **Les tâches « chaque enfant »** (faire son lit, brosser ses dents)
+  apparaissent chez tous les enfants : chacun fait la sienne et gagne ses
+  pièces. Une seule tâche à créer et à modifier pour toute la fratrie.
 - **Confirmer une tâche** crédite les pièces tout de suite. Si une tâche n'a pas
   vraiment été faite, annulez-la dans l'espace parents : les pièces sont
   retirées et la tâche redevient à faire.

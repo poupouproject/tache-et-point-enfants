@@ -831,3 +831,78 @@ describe("profil d'un enfant", () => {
     assert.equal(result.ok, false);
   });
 });
+
+describe("tâche « chaque enfant »", () => {
+  async function eachTask(title = "Faire son lit") {
+    return m.prisma.task.create({
+      data: { title, type: "EACH", pointsValue: 2, recurrence: "DAILY" },
+    });
+  }
+
+  it("se confirme une fois par enfant et par période", async () => {
+    const { alex, sam } = await makeKids();
+    const task = await eachTask();
+
+    assert.equal((await m.tasks.completeTask(task.id, alex.id)).ok, true);
+    assert.equal((await m.tasks.completeTask(task.id, sam.id)).ok, true, "l'autre enfant a la sienne");
+
+    const again = await m.tasks.completeTask(task.id, alex.id);
+    assert.equal(again.ok === false && again.reason, "ALREADY_TAKEN");
+
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 2);
+    assert.equal(await m.ledger.balanceOf(m.prisma, sam.id), 2);
+  });
+
+  it("revient le lendemain pour chacun", async () => {
+    const { alex } = await makeKids();
+    const task = await eachTask();
+    const day1 = new Date("2026-08-24T15:00:00Z");
+    const day2 = new Date("2026-08-25T15:00:00Z");
+
+    assert.equal((await m.tasks.completeTask(task.id, alex.id, day1)).ok, true);
+    assert.equal((await m.tasks.completeTask(task.id, alex.id, day2)).ok, true);
+  });
+
+  it("compte comme imposée et ne disparaît que chez celui qui l'a faite", async () => {
+    const { alex, sam } = await makeKids();
+    const task = await eachTask();
+    await m.tasks.completeTask(task.id, alex.id);
+
+    const board = await m.tasks.buildBoard();
+    const alexCard = board.find((c) => c.id === alex.id)!;
+    const samCard = board.find((c) => c.id === sam.id)!;
+
+    assert.equal(alexCard.remaining, 0);
+    assert.equal(samCard.remaining, 1);
+    assert.equal(samCard.tasks.length, 1);
+    assert.equal(m.tasks.familyRemaining(board), 0, "pas une tâche familiale");
+  });
+
+  it("garde le travail du jour quand une tâche individuelle devient « chaque enfant »", async () => {
+    const { alex, sam } = await makeKids();
+    const task = await m.prisma.task.create({
+      data: { title: "Faire son lit", type: "INDIVIDUAL", pointsValue: 2, recurrence: "DAILY", assignedChildId: alex.id },
+    });
+    await m.tasks.completeTask(task.id, alex.id);
+
+    await m.tasks.updateTask(task.id, { type: "EACH", assignedChildId: null, recurrence: "DAILY" });
+
+    const retry = await m.tasks.completeTask(task.id, alex.id);
+    assert.equal(retry.ok, false, "déjà faite aujourd'hui par Alex");
+    assert.equal((await m.tasks.completeTask(task.id, sam.id)).ok, true, "Sam peut faire la sienne");
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 2);
+  });
+
+  it("ne laisse pas repayer quand « chaque enfant » devient familiale", async () => {
+    const { alex, sam } = await makeKids();
+    const task = await eachTask("Ranger le salon");
+    await m.tasks.completeTask(task.id, alex.id);
+    await m.tasks.completeTask(task.id, sam.id);
+
+    await m.tasks.updateTask(task.id, { type: "FAMILY", recurrence: "DAILY" });
+
+    assert.equal((await m.tasks.completeTask(task.id, alex.id)).ok, false);
+    const kept = await m.prisma.taskCompletion.count({ where: { taskId: task.id } });
+    assert.equal(kept, 2, "les deux complétions restent, l'une archivée");
+  });
+});
