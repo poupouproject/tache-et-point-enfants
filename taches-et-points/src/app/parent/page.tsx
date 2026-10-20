@@ -1,4 +1,4 @@
-import { Banknote, Gift, RotateCcw } from "lucide-react";
+import { Banknote, Gift } from "lucide-react";
 
 import { CoinCount } from "@/components/coin-count";
 import { AdjustPointsForm } from "@/components/parent/adjust-points-form";
@@ -7,18 +7,24 @@ import { childColor } from "@/lib/constants";
 import { balancesByChild, formatMoney } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
 import { pendingRequests } from "@/lib/rewards/service";
-import { recentCompletions } from "@/lib/tasks/service";
 import { formatDateTime } from "@/lib/time";
+import { spendingActivity, taskActivity } from "@/lib/activity";
+import { ActivitySection, type ActivityView } from "@/components/parent/activity-section";
 import { cn } from "@/lib/utils";
 
-import { decideConversion, decideRedemption, undoCompletion } from "./actions";
+import { decideConversion, decideRedemption } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function ParentHomePage() {
+export default async function ParentHomePage({ searchParams }: PageProps<"/parent">) {
   await requireParent();
 
-  const [children, balances, { redemptions, conversions }, completions] =
+  // Section Activité: onglet et enfant choisis par ses liens.
+  const params = await searchParams;
+  const view: ActivityView = params.activite === "recompenses" ? "recompenses" : "taches";
+  const childId = typeof params.enfant === "string" ? params.enfant : null;
+
+  const [children, balances, { redemptions, conversions }, days] =
     await Promise.all([
       prisma.child.findMany({
         where: { active: true },
@@ -26,7 +32,7 @@ export default async function ParentHomePage() {
       }),
       balancesByChild(),
       pendingRequests(),
-      recentCompletions(15),
+      view === "taches" ? taskActivity(childId) : spendingActivity(childId),
     ]);
 
   const pendingCount = redemptions.length + conversions.length;
@@ -187,51 +193,12 @@ export default async function ParentHomePage() {
       <AdjustPointsForm kids={children} />
 
       {/* Confirmations récentes, avec annulation */}
-      <section className="panel p-5">
-        <h2 className="font-hud text-base text-white">Tâches confirmées</h2>
-        <p className="mt-2 text-sm text-hud-400">
-          Annuler retire les points et remet la tâche à faire.
-        </p>
-
-        {completions.length === 0 ? (
-          <p className="mt-4 rounded-2xl border-2 border-dashed border-hud-700 px-4 py-6 text-center text-sm font-bold text-hud-400">
-            Aucune tâche confirmée
-          </p>
-        ) : (
-          <ul className="mt-4 divide-y divide-hud-800">
-            {completions.map((completion) => (
-              <li key={completion.id} className="flex items-center gap-3 py-3">
-                <span className="text-xl" aria-hidden>
-                  {completion.child.avatar}
-                </span>
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold text-white">
-                    {completion.task?.title ?? "Tâche supprimée"}
-                  </p>
-                  <p className="text-xs text-hud-400">
-                    {completion.child.name} ·{" "}
-                    {formatDateTime(completion.completedAt)}
-                  </p>
-                </div>
-
-                <CoinCount value={completion.pointsAwarded} size="sm" />
-
-                <form action={undoCompletion}>
-                  <input type="hidden" name="id" value={completion.id} />
-                  <button
-                    type="submit"
-                    className="inline-flex size-9 items-center justify-center rounded-xl border-2 border-hud-700 text-hud-400 transition-colors hover:border-rose-500 hover:text-rose-400"
-                    aria-label={`Annuler ${completion.task?.title ?? "cette tâche"} pour ${completion.child.name}`}
-                  >
-                    <RotateCcw className="size-4" aria-hidden />
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <ActivitySection
+        view={view}
+        childId={childId}
+        kids={children.map(({ id, name, avatar }) => ({ id, name, avatar }))}
+        days={days}
+      />
     </main>
   );
 }

@@ -125,6 +125,28 @@ export function formatDateTime(date: Date): string {
   return `${DATE_FORMATTER.format(date)} à ${TIME_FORMATTER.format(date)}`;
 }
 
+export function formatTime(date: Date): string {
+  return TIME_FORMATTER.format(date);
+}
+
+/**
+ * Titre d'une journée d'historique: « Aujourd'hui », « Hier », sinon
+ * « lundi 19 octobre ». La clé YYYY-MM-DD est déjà dans le fuseau de la
+ * famille: on la formate en UTC pour ne pas la décaler une seconde fois.
+ */
+export function dayLabel(dateKey: string, now: Date = new Date()): string {
+  const today = dateKeyOf(now);
+  if (dateKey === today) return "Aujourd'hui";
+  if (dateKey === shiftDateKey(today, -1)) return "Hier";
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Intl.DateTimeFormat("fr-CA", {
+    timeZone: "UTC",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
 /** Libellé long du jour courant, ex. « vendredi 28 août ». */
 export function todayLabel(date: Date = new Date()): string {
   return new Intl.DateTimeFormat("fr-CA", {

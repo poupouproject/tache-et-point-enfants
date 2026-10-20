@@ -10,9 +10,9 @@ import {
   lockKiosk,
   requireParent,
   requireUnlocked,
-  verifyPin,
 } from "@/lib/auth/session";
 import { CHILD_COLOR_KEYS, RECURRENCES, TASK_TYPES } from "@/lib/constants";
+import { activeManagedPins, matchesPin } from "@/lib/auth/pins";
 import { recordTransaction } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
 import { resolveConversion, resolveRedemption } from "@/lib/rewards/service";
@@ -381,15 +381,18 @@ export async function saveSettings(
   // Les deux NIP doivent rester différents, sinon les enfants entrent dans
   // l'espace parents. Quand un seul des deux change, on le compare au hash de
   // l'autre — c'est la seule façon de tester l'égalité sans stocker de clair.
-  const newAccess = parsed.data.accessPin ?? "";
-  const newParent = parsed.data.parentPin ?? "";
+  // Un NIP imposé par Home Assistant ne se change pas ici, même par un POST
+  // direct qui contournerait le formulaire.
+  const managed = await activeManagedPins(settings);
+  const newAccess = managed.access ? "" : (parsed.data.accessPin ?? "");
+  const newParent = managed.parent ? "" : (parsed.data.parentPin ?? "");
 
   let collides = Boolean(newAccess && newParent && newAccess === newParent);
   if (!collides && newAccess && !newParent) {
-    collides = await verifyPin(newAccess, settings.parentPinHash);
+    collides = await matchesPin("parent", newAccess, settings);
   }
   if (!collides && newParent && !newAccess) {
-    collides = await verifyPin(newParent, settings.accessPinHash);
+    collides = await matchesPin("access", newParent, settings);
   }
 
   if (collides) {

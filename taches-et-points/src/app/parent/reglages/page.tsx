@@ -1,6 +1,7 @@
 import { LogOut } from "lucide-react";
 
 import { SettingsForm } from "@/components/parent/settings-form";
+import { activeManagedPins } from "@/lib/auth/pins";
 import { requireParent } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { APP_TIMEZONE } from "@/lib/time";
@@ -13,23 +14,28 @@ export default async function ParentSettingsPage() {
   await requireParent();
 
   const settings = await prisma.appSettings.findUnique({ where: { id: 1 } });
+  const managed = await activeManagedPins(settings);
 
   return (
     <main className="mx-auto w-full max-w-2xl space-y-5">
       <h2 className="font-hud text-base text-white">Réglages</h2>
 
-      <SettingsForm pointsPerDollar={settings?.pointsPerDollar ?? 100} />
+      <SettingsForm
+        pointsPerDollar={settings?.pointsPerDollar ?? 100}
+        managed={{ access: Boolean(managed.access), parent: Boolean(managed.parent) }}
+      />
 
       <section className="panel p-5">
         <h3 className="font-bold text-white">Fuseau horaire</h3>
         <p className="mt-2 text-sm text-hud-400">
           Les journées et les semaines sont calculées en{" "}
-          <span className="font-bold text-coin">{APP_TIMEZONE}</span>. Cela se
-          change avec la variable d&apos;environnement{" "}
+          <span className="font-bold text-coin">{APP_TIMEZONE}</span>. Il se
+          change dans la configuration de l&apos;application dans Home
+          Assistant, ou avec la variable{" "}
           <code className="rounded bg-hud-950 px-2 py-0.5 text-xs">
             APP_TIMEZONE
           </code>{" "}
-          (option de l&apos;add-on).
+          hors Home Assistant.
         </p>
       </section>
 

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { managedPins } from "@/lib/auth/pins";
 import { getSettings } from "@/lib/auth/session";
 
 import { SetupForm } from "./setup-form";
@@ -12,7 +13,12 @@ export default async function WelcomePage() {
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
-      <SetupForm />
+      <SetupForm
+        managed={{
+          access: Boolean(managedPins().access),
+          parent: Boolean(managedPins().parent),
+        }}
+      />
     </main>
   );
 }

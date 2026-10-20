@@ -150,6 +150,7 @@ natifs Linux (ceux de Tailwind, notamment), et le `npm ci` de l'image Docker
 | `DATABASE_URL` | Fichier SQLite, ex. `file:./dev.db` |
 | `SESSION_SECRET` | Clé de signature des sessions, 32 caractères minimum |
 | `APP_TIMEZONE` | Fuseau pour le calcul des journées (défaut `America/Toronto`) |
+| `ACCESS_PIN`, `PARENT_PIN` | Facultatifs : NIP imposés, qui font foi sur ceux de l'app (4 à 8 chiffres) |
 
 Générer un secret :
 
@@ -157,7 +158,8 @@ Générer un secret :
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
-Dans l'add-on, ces trois variables sont gérées automatiquement par `run.sh`.
+Dans l'add-on, ces variables sont gérées par `run.sh`, à partir des options
+de l'add-on pour le fuseau et les NIP.
 
 ## Installation comme add-on Home Assistant
 
@@ -166,9 +168,21 @@ Dans l'add-on, ces trois variables sont gérées automatiquement par `run.sh`.
 2. Installer **Quêtes & Pièces** dans la liste, puis démarrer.
 3. Ouvrir `http://<ip-de-home-assistant>:3000` et choisir les deux NIP.
 
-Option de l'add-on : `timezone` (fuseau de la famille, au format
-`America/Montreal`). Un fuseau inconnu est ignoré au profit de
-`America/Toronto`, avec un avertissement dans le journal de l'add-on.
+Options de l'add-on :
+
+- `timezone` — fuseau de la famille, au format `America/Montreal`. Un fuseau
+  inconnu est ignoré au profit de `America/Toronto`, avec un avertissement
+  dans le journal de l'add-on.
+- `access_pin`, `parent_pin` — facultatifs. Remplis, ils font foi : l'app
+  affiche « Géré dans Home Assistant » et ne permet plus de les changer.
+  Vides, les NIP se gèrent dans l'app. C'est le moyen de récupérer un NIP
+  oublié : remplir l'option, redémarrer, entrer. L'app enregistre alors le
+  hash du NIP, qui reste valide si l'option est vidée ensuite
+  (`src/lib/auth/pins.ts`). `run.sh` les valide (4 à 8 chiffres, NIP
+  parent différent du NIP d'entrée) et ne les écrit jamais au journal.
+
+Les libellés des options affichés dans Home Assistant sont dans
+`taches-et-points/translations/`.
 
 La fiche de l'add-on dans Home Assistant (onglet Documentation) vient de
 `taches-et-points/DOCS.md`, écrite pour un parent. L'icône et le logo de la
@@ -266,7 +280,8 @@ repository.yaml            Déclare le dépôt comme boutique d'add-ons HA
 .github/workflows/         Publication des images, PR de version, contrôle du changeset
 docs/captures/             Captures d'écran du README
 taches-et-points/          L'add-on (= le contexte de build Docker)
-  config.yaml              Manifeste: port direct, pas d'ingress, /data
+  config.yaml              Manifeste: port direct, pas d'ingress, /data, options
+  translations/            Libellés des options dans Home Assistant (fr, en)
   DOCS.md                  Fiche « Documentation » de l'add-on dans Home Assistant
   icon.png, logo.png       Icône et logo de la boutique d'applications
   build.yaml               Images de base par architecture

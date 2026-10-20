@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { managedPins } from "@/lib/auth/pins";
 import { hashPin, unlockKiosk } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 
@@ -19,8 +20,10 @@ export async function completeSetup(
   const existing = await prisma.appSettings.findUnique({ where: { id: 1 } });
   if (existing) return { error: "L'application est déjà configurée." };
 
-  const accessPin = String(formData.get("accessPin") ?? "");
-  const parentPin = String(formData.get("parentPin") ?? "");
+  // Un NIP imposé par Home Assistant n'est pas demandé dans le formulaire.
+  const managed = managedPins();
+  const accessPin = managed.access ?? String(formData.get("accessPin") ?? "");
+  const parentPin = managed.parent ?? String(formData.get("parentPin") ?? "");
 
   if (!/^\d{4,8}$/.test(accessPin) || !/^\d{4,8}$/.test(parentPin)) {
     return { error: "Chaque NIP doit contenir de 4 à 8 chiffres." };

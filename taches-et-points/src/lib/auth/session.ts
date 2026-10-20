@@ -1,6 +1,5 @@
 import "server-only";
 
-import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -136,15 +135,9 @@ export async function requireParent() {
 
 // --- PIN -------------------------------------------------------------------
 
-// bcryptjs est du JavaScript pur: sa variante synchrone monopolise la boucle
-// d'événements pendant tout le calcul, ce qui fige le serveur à chaque essai.
-export function hashPin(pin: string): Promise<string> {
-  return bcrypt.hash(pin, 10);
-}
-
-export function verifyPin(pin: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(pin, hash);
-}
+// Le hachage vit à part, sans dépendance à Next: pins.ts et les tests s'en
+// servent hors d'une requête.
+export { hashPin, verifyPin } from "@/lib/auth/pin-hash";
 
 /**
  * Réglages de l'app. La ligne est un singleton (id = 1) créée par le seed;

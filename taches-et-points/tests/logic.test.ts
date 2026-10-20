@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import path from "node:path";
-import { after, before, beforeEach, describe, it } from "node:test";
+import { after, afterEach, before, beforeEach, describe, it } from "node:test";
 
 const TEST_DB = path.join(process.cwd(), "tests", "test.db");
 
@@ -904,5 +904,116 @@ describe("tâche « chaque enfant »", () => {
     assert.equal((await m.tasks.completeTask(task.id, alex.id)).ok, false);
     const kept = await m.prisma.taskCompletion.count({ where: { taskId: task.id } });
     assert.equal(kept, 2, "les deux complétions restent, l'une archivée");
+  });
+});
+
+describe("NIP imposés par Home Assistant", () => {
+  async function pins() {
+    return import("../src/lib/auth/pins");
+  }
+  async function storeHashes(access: string, parent: string) {
+    const { hashPin } = await import("../src/lib/auth/pin-hash");
+    await m.prisma.appSettings.update({
+      where: { id: 1 },
+      data: { accessPinHash: await hashPin(access), parentPinHash: await hashPin(parent) },
+    });
+  }
+
+  afterEach(() => {
+    delete process.env.ACCESS_PIN;
+    delete process.env.PARENT_PIN;
+  });
+
+  it("sans option, le NIP de l'app fait foi", async () => {
+    const { checkPin } = await pins();
+    await storeHashes("1111", "2222");
+
+    assert.equal(await checkPin("parent", "2222"), true);
+    assert.equal(await checkPin("parent", "9999"), false);
+  });
+
+  it("remplace un NIP oublié, et le garde une fois l'option vidée", async () => {
+    const { checkPin } = await pins();
+    await storeHashes("1111", "2222"); // 2222: le NIP parent oublié
+
+    process.env.PARENT_PIN = "4826";
+    assert.equal(await checkPin("parent", "2222"), false, "l'ancien NIP ne passe plus");
+    assert.equal(await checkPin("parent", "4826"), true);
+
+    delete process.env.PARENT_PIN;
+    assert.equal(await checkPin("parent", "4826"), true, "recopié dans l'app");
+    assert.equal(await checkPin("parent", "2222"), false);
+  });
+
+  it("ignore un NIP parent identique au NIP d'entrée", async () => {
+    const { managedPins } = await pins();
+    process.env.ACCESS_PIN = "1234";
+    process.env.PARENT_PIN = "1234";
+
+    assert.deepEqual(managedPins(), { access: "1234", parent: null });
+  });
+
+  it("ignore un NIP parent imposé identique au NIP d'entrée de l'app", async () => {
+    const { checkPin } = await pins();
+    await storeHashes("1111", "2222");
+    process.env.PARENT_PIN = "1111";
+
+    assert.equal(await checkPin("parent", "1111"), false, "le NIP d'entrée n'ouvre pas l'espace parents");
+    assert.equal(await checkPin("parent", "2222"), true, "le NIP parent de l'app reste en place");
+  });
+
+  it("ignore une option mal formée", async () => {
+    const { managedPins } = await pins();
+    process.env.ACCESS_PIN = "12";
+    process.env.PARENT_PIN = "abcd";
+
+    assert.deepEqual(managedPins(), { access: null, parent: null });
+  });
+});
+
+describe("activité de l'espace parents", () => {
+  it("regroupe les tâches faites par jour, du plus récent au plus ancien", async () => {
+    const { alex, sam } = await makeKids();
+    const task = await m.prisma.task.create({
+      data: { title: "Lit", type: "EACH", pointsValue: 2, recurrence: "DAILY" },
+    });
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    // completedAt est posé par la base: la veille se crée à la main.
+    await m.prisma.taskCompletion.create({
+      data: { taskId: task.id, childId: alex.id, periodKey: m.due.occurrenceKey(task, alex.id, yesterday), pointsAwarded: 2, completedAt: yesterday },
+    });
+    await m.tasks.completeTask(task.id, alex.id, now);
+    await m.tasks.completeTask(task.id, sam.id, now);
+
+    const activity = await import("../src/lib/activity");
+    const days = await activity.taskActivity(null, now);
+
+    assert.deepEqual(days.map((d) => d.label), ["Aujourd'hui", "Hier"]);
+    assert.equal(days[0].items.length, 2);
+    assert.equal(days[0].total, 4);
+
+    const alexOnly = await activity.taskActivity(alex.id, now);
+    assert.deepEqual(alexOnly.map((d) => d.items.length), [1, 1], "filtre par enfant");
+  });
+
+  it("liste les récompenses et l'argent demandés, avec leur statut", async () => {
+    const { alex } = await makeKids();
+    await m.ledger.recordTransaction(m.prisma, {
+      childId: alex.id, type: "MANUAL_ADJUST", points: 300, source: "MANUAL", description: "Départ",
+    });
+    const reward = await m.prisma.reward.create({ data: { name: "Film", costPoints: 50 } });
+    await m.rewards.requestReward(alex.id, reward.id);
+    await m.rewards.requestConversion(alex.id, 200);
+    const redemption = await m.prisma.rewardRedemption.findFirstOrThrow();
+    await m.rewards.resolveRedemption(redemption.id, "FULFILLED");
+
+    const activity = await import("../src/lib/activity");
+    const [today] = await activity.spendingActivity(alex.id);
+
+    assert.equal(today.items.length, 2);
+    assert.equal(today.total, 250);
+    const film = today.items.find((i) => i.title === "Film");
+    assert.equal(film?.kind !== "task" && film?.status, "FULFILLED");
   });
 });
