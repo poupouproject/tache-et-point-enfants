@@ -1017,3 +1017,96 @@ describe("activité de l'espace parents", () => {
     assert.equal(film?.kind !== "task" && film?.status, "FULFILLED");
   });
 });
+
+describe("Home Assistant", () => {
+  async function ha() {
+    return {
+      states: await import("../src/lib/ha/states"),
+      decision: await import("../src/lib/ha/decision"),
+    };
+  }
+  async function fund(childId: string, points: number) {
+    await m.ledger.recordTransaction(m.prisma, {
+      childId, type: "MANUAL_ADJUST", points, source: "MANUAL", description: "Départ",
+    });
+  }
+
+  afterEach(() => {
+    delete process.env.HA_DECISION_TOKEN;
+  });
+
+  it("nomme les entités d'après le prénom, sans accents", async () => {
+    const { states } = await ha();
+    assert.equal(states.slugify("Éloi"), "eloi");
+    assert.equal(states.slugify("Marie-Ève"), "marie_eve");
+    assert.equal(states.slugify("🦊"), "enfant");
+  });
+
+  it("expose les pièces, les tâches à faire et les demandes en attente", async () => {
+    const { states } = await ha();
+    const { alex } = await makeKids();
+    await fund(alex.id, 120);
+    await m.prisma.task.create({ data: { title: "Lit", type: "EACH", pointsValue: 1, recurrence: "DAILY" } });
+    await m.prisma.task.create({ data: { title: "Vaisselle", type: "FAMILY", pointsValue: 3, recurrence: "DAILY" } });
+    const reward = await m.prisma.reward.create({ data: { name: "Film", costPoints: 20 } });
+    await m.rewards.requestReward(alex.id, reward.id);
+
+    const all = await states.buildStates();
+    const byId = new Map(all.map((s) => [s.entityId, s]));
+
+    assert.equal(byId.get("sensor.quetes_pieces_alex")?.state, 100);
+    assert.equal(byId.get("sensor.quetes_pieces_alex_taches")?.state, 1);
+    assert.deepEqual(byId.get("sensor.quetes_pieces_alex_taches")?.attributes.taches, ["Lit"]);
+    assert.equal(byId.get("sensor.quetes_pieces_taches_familiales")?.state, 1);
+    assert.equal(byId.get("sensor.quetes_pieces_demandes")?.state, 1);
+  });
+
+  it("refuse un jeton absent, faux ou trop court", async () => {
+    const { decision } = await ha();
+    assert.equal(decision.isAuthorized("Bearer x"), false, "rien de configuré");
+
+    process.env.HA_DECISION_TOKEN = "a".repeat(64);
+    assert.equal(decision.isAuthorized(null), false);
+    assert.equal(decision.isAuthorized("Bearer " + "b".repeat(64)), false);
+    assert.equal(decision.isAuthorized("Bearer " + "a".repeat(64)), true);
+
+    process.env.HA_DECISION_TOKEN = "court";
+    assert.equal(decision.decisionToken(), null, "un jeton de moins de 32 caractères est ignoré");
+  });
+
+  it("approuve une récompense, une seule fois", async () => {
+    const { decision } = await ha();
+    const { alex } = await makeKids();
+    await fund(alex.id, 100);
+    const reward = await m.prisma.reward.create({ data: { name: "Film", costPoints: 50 } });
+    const request = await m.rewards.requestReward(alex.id, reward.id);
+    assert.ok(request.ok);
+
+    const first = await decision.applyDecision({ type: "recompense", id: request.id, decision: "approuver" });
+    const second = await decision.applyDecision({ type: "recompense", id: request.id, decision: "refuser" });
+
+    assert.deepEqual(first, { ok: true, applied: true });
+    assert.deepEqual(second, { ok: true, applied: false }, "déjà réglée: le refus ne rembourse pas");
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 50);
+  });
+
+  it("refuse une conversion en argent et rembourse", async () => {
+    const { decision } = await ha();
+    const { alex } = await makeKids();
+    await fund(alex.id, 300);
+    const request = await m.rewards.requestConversion(alex.id, 200);
+    assert.ok(request.ok);
+
+    const result = await decision.applyDecision({ type: "argent", id: request.id, decision: "refuser" });
+
+    assert.deepEqual(result, { ok: true, applied: true });
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 300);
+  });
+
+  it("rejette une décision mal formée", async () => {
+    const { decision } = await ha();
+    for (const body of [null, {}, { type: "cadeau", id: "x", decision: "approuver" }, { type: "argent", id: "x", decision: "peut-etre" }]) {
+      assert.equal((await decision.applyDecision(body)).ok, false);
+    }
+  });
+});

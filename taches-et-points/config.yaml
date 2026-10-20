@@ -19,6 +19,11 @@ image: ghcr.io/poupouproject/taches-et-points-{arch}
 # pour que les signaux d'arrêt atteignent Node et que rien ne devienne zombie.
 init: true
 
+# Donne à l'add-on un jeton (SUPERVISOR_TOKEN) pour l'API de Home Assistant:
+# l'app y publie ses événements (demandes, décisions, tâches) et ses capteurs
+# (pièces, tâches à faire, demandes en attente). Voir src/lib/ha/.
+homeassistant_api: true
+
 # Volontairement PAS d'ingress: l'app doit être joignable directement par URL
 # sur le réseau local (http://<ip-ha>:3000), sans passer par une session Home
 # Assistant ni apparaître dans la barre latérale. C'est le NIP de l'app qui

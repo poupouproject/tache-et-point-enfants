@@ -66,6 +66,23 @@ if [ -n "$PARENT_PIN_OPTION" ]; then
   fi
 fi
 
+# --- Home Assistant ---------------------------------------------------------
+# Jeton qu'un rest_command de Home Assistant doit présenter pour approuver ou
+# refuser une demande (POST /api/ha/decision). Généré une fois et conservé,
+# comme le secret de session; affiché dans les réglages de l'app.
+DECISION_TOKEN_FILE="$DATA_DIR/ha_decision_token"
+if [ ! -s "$DECISION_TOKEN_FILE" ]; then
+  node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))" > "$DECISION_TOKEN_FILE"
+  chmod 600 "$DECISION_TOKEN_FILE"
+fi
+HA_DECISION_TOKEN="$(cat "$DECISION_TOKEN_FILE")"
+export HA_DECISION_TOKEN
+
+# Nom sous lequel Home Assistant joint l'add-on (ex. ced7ebf3-taches-et-points),
+# pour l'URL du rest_command. Lu avant que HOSTNAME serve à Next, plus bas.
+ADDON_HOSTNAME="$(cat /etc/hostname 2>/dev/null || true)"
+export ADDON_HOSTNAME
+
 # --- Secret de session ------------------------------------------------------
 # Généré une seule fois puis conservé: le régénérer à chaque démarrage
 # déconnecterait tout le monde à la moindre mise à jour de l'add-on.
