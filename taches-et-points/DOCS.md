@@ -68,10 +68,15 @@ et les récompenses.
   votre approbation sur l'accueil de l'espace parents. Un refus rembourse
   l'enfant.
 - **Fermer la boutique d'un enfant** : dans **Espace parents → Enfants**,
-  *Fermer la boutique*, pour 30 minutes à une semaine, avec une raison. Sa carte
+  *Fermer la boutique*, jusqu'à la fin de la journée ou pour une durée
+  (30 minutes à une semaine), avec une raison. Sa carte
   affiche « Boutique fermée jusqu'à 18 h 30 » et la raison, et il ne peut plus
   demander de récompense ni d'argent. Il peut toujours gagner des pièces. La
   boutique rouvre d'elle-même à l'heure prévue, ou avec *Rouvrir*.
+- **La tablette se tient à jour seule** : ce qui change depuis un autre
+  appareil (une boutique fermée, une tâche prise par un frère) apparaît en
+  moins d'une demi-minute, sans recharger la page. Rien ne bouge pendant
+  qu'un enfant a une fenêtre ouverte : la mise à jour suit sa fermeture.
 - **Un enfant masqué** garde tout son historique, mais n'apparaît plus au
   tableau et ne peut plus gagner ni dépenser de pièces.
 

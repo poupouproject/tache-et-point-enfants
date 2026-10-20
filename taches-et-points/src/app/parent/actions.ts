@@ -449,7 +449,7 @@ export async function lockChildSpending(
 
   const ok = await lockSpending(
     String(formData.get("childId") ?? ""),
-    Number(formData.get("minutes")),
+    String(formData.get("duree") ?? ""),
     String(formData.get("reason") ?? ""),
   );
   if (!ok) return { error: "Choisissez une durée de la liste." };

@@ -1127,7 +1127,7 @@ describe("boutique fermée par un parent", () => {
   it("refuse récompenses et argent, avec la raison", async () => {
     const c = await children();
     const { alex, reward } = await setup();
-    assert.equal(await c.lockSpending(alex.id, 60, "  Chambre pas rangée  "), true);
+    assert.equal(await c.lockSpending(alex.id, "60", "  Chambre pas rangée  "), true);
 
     const buy = await m.rewards.requestReward(alex.id, reward.id);
     const money = await m.rewards.requestConversion(alex.id, 100);
@@ -1141,7 +1141,7 @@ describe("boutique fermée par un parent", () => {
   it("laisse gagner des pièces", async () => {
     const c = await children();
     const { alex } = await setup();
-    await c.lockSpending(alex.id, 60, "");
+    await c.lockSpending(alex.id, "60", "");
     const task = await m.prisma.task.create({ data: { title: "Lit", type: "EACH", pointsValue: 2, recurrence: "DAILY" } });
 
     assert.equal((await m.tasks.completeTask(task.id, alex.id)).ok, true);
@@ -1151,10 +1151,10 @@ describe("boutique fermée par un parent", () => {
     const c = await children();
     const { alex, reward } = await setup();
     const past = new Date(Date.now() - 2 * 60 * 60 * 1000);
-    await c.lockSpending(alex.id, 60, "Hier soir", past); // échue depuis une heure
+    await c.lockSpending(alex.id, "60", "Hier soir", past); // échue depuis une heure
     assert.equal((await m.rewards.requestReward(alex.id, reward.id)).ok, true);
 
-    await c.lockSpending(alex.id, 60, "");
+    await c.lockSpending(alex.id, "60", "");
     await c.unlockSpending(alex.id);
     assert.equal((await m.rewards.requestReward(alex.id, reward.id)).ok, true);
   });
@@ -1162,7 +1162,7 @@ describe("boutique fermée par un parent", () => {
   it("s'affiche sur la carte de l'enfant", async () => {
     const c = await children();
     const { alex } = await setup();
-    await c.lockSpending(alex.id, 30, "Écrans");
+    await c.lockSpending(alex.id, "30", "Écrans");
 
     const card = (await m.tasks.buildBoard()).find((child) => child.id === alex.id)!;
     assert.equal(card.spendLock?.reason, "Écrans");
@@ -1172,7 +1172,28 @@ describe("boutique fermée par un parent", () => {
   it("n'accepte que les durées proposées", async () => {
     const c = await children();
     const { alex } = await setup();
-    assert.equal(await c.lockSpending(alex.id, 999_999, "trop"), false);
-    assert.equal(await c.lockSpending(alex.id, -5, "négatif"), false);
+    assert.equal(await c.lockSpending(alex.id, "999999", "trop"), false);
+    assert.equal(await c.lockSpending(alex.id, "-5", "négatif"), false);
+  });
+});
+
+describe("fin de journée chez la famille", () => {
+  it("trouve minuit à Toronto, heure d'été comme d'hiver", () => {
+    assert.equal(m.time.startOfLocalDay("2026-10-21").toISOString(), "2026-10-21T04:00:00.000Z");
+    assert.equal(m.time.startOfLocalDay("2026-11-02").toISOString(), "2026-11-02T05:00:00.000Z");
+    // Jour du passage à l'heure normale (1er novembre 2026): minuit est encore en heure d'été.
+    assert.equal(m.time.startOfLocalDay("2026-11-01").toISOString(), "2026-11-01T04:00:00.000Z");
+  });
+
+  it("ferme la boutique jusqu'à minuit et l'annonce comme tel", async () => {
+    const c = await import("../src/lib/children");
+    const { alex } = await makeKids();
+    const afternoon = new Date("2026-10-20T19:30:00Z"); // 15 h 30 à Toronto
+
+    assert.equal(await c.lockSpending(alex.id, "fin-journee", "Écrans", afternoon), true);
+    const child = await m.prisma.child.findUniqueOrThrow({ where: { id: alex.id } });
+
+    assert.equal(child.spendLockedUntil?.toISOString(), "2026-10-21T04:00:00.000Z");
+    assert.equal(m.time.formatUntil(child.spendLockedUntil!, afternoon), "minuit");
   });
 });

@@ -2,6 +2,7 @@ import "server-only";
 
 import { AVATARS, CHILD_COLOR_KEYS } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
+import { endOfLocalDay } from "@/lib/time";
 
 export type ProfileResult =
   | { ok: true }
@@ -34,16 +35,26 @@ export async function updateChildProfile(
 
 // --- Boutique bloquée --------------------------------------------------------
 
-/** Durées proposées aux parents, en minutes. */
+/**
+ * Durées proposées aux parents. « Fin de la journée » s'arrête à minuit chez
+ * la famille, quelle que soit l'heure où le blocage est posé.
+ */
 export const LOCK_DURATIONS = [
-  { minutes: 30, label: "30 minutes" },
-  { minutes: 60, label: "1 heure" },
-  { minutes: 120, label: "2 heures" },
-  { minutes: 240, label: "4 heures" },
-  { minutes: 24 * 60, label: "1 jour" },
-  { minutes: 3 * 24 * 60, label: "3 jours" },
-  { minutes: 7 * 24 * 60, label: "1 semaine" },
+  { key: "30", label: "30 minutes" },
+  { key: "60", label: "1 heure" },
+  { key: "120", label: "2 heures" },
+  { key: "240", label: "4 heures" },
+  { key: "fin-journee", label: "Jusqu'à la fin de la journée" },
+  { key: "1440", label: "24 heures" },
+  { key: "4320", label: "3 jours" },
+  { key: "10080", label: "1 semaine" },
 ] as const;
+
+function lockEnd(key: string, now: Date): Date | null {
+  if (!LOCK_DURATIONS.some((duration) => duration.key === key)) return null;
+  if (key === "fin-journee") return endOfLocalDay(now);
+  return new Date(now.getTime() + Number(key) * 60 * 1000);
+}
 
 export const LOCK_REASON_MAX = 120;
 
@@ -74,17 +85,18 @@ export async function spendLockOf(childId: string, now: Date = new Date()): Prom
  */
 export async function lockSpending(
   childId: string,
-  minutes: number,
+  duration: string,
   reason: string,
   now: Date = new Date(),
 ): Promise<boolean> {
-  if (!LOCK_DURATIONS.some((duration) => duration.minutes === minutes)) return false;
+  const until = lockEnd(duration, now);
+  if (!until) return false;
   const cleanReason = reason.trim().slice(0, LOCK_REASON_MAX) || null;
 
   const updated = await prisma.child.updateMany({
     where: { id: childId },
     data: {
-      spendLockedUntil: new Date(now.getTime() + minutes * 60 * 1000),
+      spendLockedUntil: until,
       spendLockReason: cleanReason,
     },
   });
