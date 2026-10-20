@@ -58,8 +58,12 @@ et les récompenses.
   apparaissent chez tous les enfants : chacun fait la sienne et gagne ses
   pièces. Une seule tâche à créer et à modifier pour toute la fratrie.
 - **Confirmer une tâche** crédite les pièces tout de suite. Si une tâche n'a pas
-  vraiment été faite, annulez-la dans l'espace parents : les pièces sont
-  retirées et la tâche redevient à faire.
+  vraiment été faite, annulez-la dans l'espace parents, section **Activité**
+  (une confirmation est demandée) : les pièces sont retirées et la tâche
+  redevient à faire.
+- **La section Activité** de l'espace parents montre les deux dernières
+  semaines, jour par jour : les tâches faites, ou les récompenses et l'argent
+  demandés avec leur statut. Un filtre affiche un seul enfant.
 - **Les récompenses et l'argent** sont débités dès la demande, puis attendent
   votre approbation sur l'accueil de l'espace parents. Un refus rembourse
   l'enfant.

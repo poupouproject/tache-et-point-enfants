@@ -4,7 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { balancesByChild, recordTransaction } from "@/lib/ledger";
 import { isDueNow, occurrenceKey } from "@/lib/tasks/due";
-import { dateKeyOf, shiftDateKey, localParts } from "@/lib/time";
+import { dateKeyOf, shiftDateKey } from "@/lib/time";
 
 export type DueTask = {
   id: string;
@@ -434,21 +434,4 @@ function isUniqueViolation(error: unknown): boolean {
     "code" in error &&
     (error as { code?: string }).code === "P2002"
   );
-}
-
-/** Confirmations récentes, pour l'écran d'annulation du mode parent. */
-export async function recentCompletions(limit = 40) {
-  const completions = await prisma.taskCompletion.findMany({
-    orderBy: { completedAt: "desc" },
-    take: limit,
-    include: {
-      child: { select: { name: true, color: true, avatar: true } },
-      task: { select: { title: true, icon: true } },
-    },
-  });
-
-  return completions.map((completion) => ({
-    ...completion,
-    isToday: dateKeyOf(completion.completedAt) === localParts().dateKey,
-  }));
 }
