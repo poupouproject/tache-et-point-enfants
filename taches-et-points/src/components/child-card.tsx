@@ -1,6 +1,6 @@
 "use client";
 
-import { Flame, History, Pencil, Plus, ShoppingBag, Users } from "lucide-react";
+import { Flame, History, Lock, Pencil, Plus, ShoppingBag, Users } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 
@@ -121,6 +121,17 @@ export function ChildCard({
           : "Tout est fait ! 🎉"}
       </p>
 
+      {/* Un parent a fermé la boutique: l'enfant voit jusqu'à quand et pourquoi. */}
+      {child.spendLock && (
+        <p role="status" className="flex items-start gap-2 rounded-2xl bg-rose-500/15 px-4 py-2.5 text-sm font-bold text-rose-200">
+          <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>
+            Boutique fermée jusqu&apos;à {child.spendLock.until}
+            {child.spendLock.reason && <span className="block font-normal text-rose-100">{child.spendLock.reason}</span>}
+          </span>
+        </p>
+      )}
+
       <div className="mt-auto grid gap-3">
         <button
           type="button"
@@ -132,8 +143,17 @@ export function ChildCard({
           J&apos;ai fait une tâche
         </button>
         <div className="grid grid-cols-2 gap-3">
-          <button type="button" onClick={() => setPanel("shop")} className="btn-coin px-3 text-base">
-            <ShoppingBag className="size-5" aria-hidden />
+          <button
+            type="button"
+            onClick={() => setPanel("shop")}
+            disabled={Boolean(child.spendLock)}
+            className="btn-coin px-3 text-base"
+          >
+            {child.spendLock ? (
+              <Lock className="size-5" aria-hidden />
+            ) : (
+              <ShoppingBag className="size-5" aria-hidden />
+            )}
             Dépenser
           </button>
           <button type="button" onClick={() => setPanel("history")} className="btn-secondary px-3 text-base">

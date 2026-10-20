@@ -147,6 +147,18 @@ export function dayLabel(dateKey: string, now: Date = new Date()): string {
   }).format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
+/**
+ * Échéance lisible par un enfant: « 18 h 30 » aujourd'hui, « demain à 7 h 00 »,
+ * sinon « 23 octobre à 18 h 30 ».
+ */
+export function formatUntil(date: Date, now: Date = new Date()): string {
+  const day = dateKeyOf(date);
+  const today = dateKeyOf(now);
+  if (day === today) return TIME_FORMATTER.format(date);
+  if (day === shiftDateKey(today, 1)) return `demain à ${TIME_FORMATTER.format(date)}`;
+  return formatDateTime(date);
+}
+
 /** Libellé long du jour courant, ex. « vendredi 28 août ». */
 export function todayLabel(date: Date = new Date()): string {
   return new Intl.DateTimeFormat("fr-CA", {

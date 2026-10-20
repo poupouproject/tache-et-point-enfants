@@ -67,6 +67,11 @@ et les récompenses.
 - **Les récompenses et l'argent** sont débités dès la demande, puis attendent
   votre approbation sur l'accueil de l'espace parents. Un refus rembourse
   l'enfant.
+- **Fermer la boutique d'un enfant** : dans **Espace parents → Enfants**,
+  *Fermer la boutique*, pour 30 minutes à une semaine, avec une raison. Sa carte
+  affiche « Boutique fermée jusqu'à 18 h 30 » et la raison, et il ne peut plus
+  demander de récompense ni d'argent. Il peut toujours gagner des pièces. La
+  boutique rouvre d'elle-même à l'heure prévue, ou avec *Rouvrir*.
 - **Un enfant masqué** garde tout son historique, mais n'apparaît plus au
   tableau et ne peut plus gagner ni dépenser de pièces.
 
@@ -123,7 +128,7 @@ la famille. Mis à jour à chaque changement, et toutes les cinq minutes.
 
 | Entité | Valeur | Attributs utiles |
 |---|---|---|
-| `sensor.quetes_pieces_<prénom>` | Pièces de l'enfant | `valeur` (en dollars), `serie`, `taches_restantes` |
+| `sensor.quetes_pieces_<prénom>` | Pièces de l'enfant | `valeur` (en dollars), `serie`, `taches_restantes`, `boutique_fermee`, `boutique_fermee_jusqu_a`, `boutique_fermee_raison` |
 | `sensor.quetes_pieces_<prénom>_taches` | Tâches qu'il lui reste aujourd'hui | `taches` (les titres) |
 | `sensor.quetes_pieces_taches_familiales` | Tâches au choix encore libres | `taches` |
 | `sensor.quetes_pieces_demandes` | Demandes à approuver | `demandes` (type, id, enfant, titre, pièces) |

@@ -30,6 +30,8 @@ panneau dans la barre latérale, c'est un NIP qui protège l'accès.
   suite; un parent peut annuler après coup.
 - **Boutique et argent** — récompenses achetables en pièces, et conversion en
   dollars au taux de votre choix. Les deux passent par une approbation parent.
+- **Boutique fermée** — un parent bloque récompenses et argent d'un enfant
+  pour un temps, avec une raison affichée sur sa carte; gagner reste possible.
 - **Ma carte** — chaque enfant choisit lui-même son avatar et sa couleur.
 - **Installable** — l'app se pose sur l'écran d'accueil d'une tablette et
   s'ouvre en plein écran (voir *Installer sur une tablette*).
