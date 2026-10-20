@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireUnlocked } from "@/lib/auth/session";
+import { scheduleHaSync } from "@/lib/ha/sync";
 import { updateChildProfile } from "@/lib/children";
 import { requestConversion, requestReward } from "@/lib/rewards/service";
 
@@ -32,6 +33,7 @@ export async function saveProfile(
   }
 
   revalidatePath("/");
+  scheduleHaSync();
   redirect("/");
 }
 
@@ -51,6 +53,7 @@ export async function buyReward(
 
   const result = await requestReward(childId, rewardId);
   revalidatePath("/");
+  scheduleHaSync();
 
   if (!result.ok) {
     return {
@@ -83,6 +86,7 @@ export async function convertToMoney(
 
   const result = await requestConversion(childId, points);
   revalidatePath("/");
+  scheduleHaSync();
 
   if (!result.ok) {
     return {

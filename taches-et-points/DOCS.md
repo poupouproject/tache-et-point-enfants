@@ -111,6 +111,63 @@ redémarrez. Le NIP reste celui que vous venez de choisir, puisque l'application
 l'a enregistré à votre première entrée ; il se change de nouveau dans
 **Réglages**.
 
+## Dans Home Assistant
+
+L'application publie d'elle-même des capteurs et des événements dans Home
+Assistant : rien à installer.
+
+### Capteurs
+
+Un jeu par enfant (`<prénom>` sans accents : Éloi → `eloi`), plus deux pour
+la famille. Mis à jour à chaque changement, et toutes les cinq minutes.
+
+| Entité | Valeur | Attributs utiles |
+|---|---|---|
+| `sensor.quetes_pieces_<prénom>` | Pièces de l'enfant | `valeur` (en dollars), `serie`, `taches_restantes` |
+| `sensor.quetes_pieces_<prénom>_taches` | Tâches qu'il lui reste aujourd'hui | `taches` (les titres) |
+| `sensor.quetes_pieces_taches_familiales` | Tâches au choix encore libres | `taches` |
+| `sensor.quetes_pieces_demandes` | Demandes à approuver | `demandes` (type, id, enfant, titre, pièces) |
+
+Ces capteurs se placent sur un tableau de bord comme les autres. Ils ne
+peuvent pas être renommés depuis l'interface, et après un redémarrage de Home
+Assistant ils réapparaissent dans les cinq minutes.
+
+### Événements
+
+À utiliser comme déclencheur d'automatisation (*Déclencheur : Événement*) :
+
+| Événement | Quand | Données |
+|---|---|---|
+| `quetes_pieces_demande` | Un enfant demande une récompense ou de l'argent | `type` (recompense, argent), `id`, `enfant`, `titre`, `pieces`, `message` |
+| `quetes_pieces_decision` | Une demande est approuvée ou refusée | `type`, `id`, `decision` (approuvee, refusee), `enfant`, `titre`, `source` (app, home_assistant) |
+| `quetes_pieces_tache` | Un enfant confirme une tâche | `enfant`, `tache`, `pieces` |
+
+Par exemple : annoncer « Bravo Flavie ! » sur le haut-parleur de la cuisine à
+chaque `quetes_pieces_tache`.
+
+### Approuver depuis une notification
+
+Une notification sur le téléphone avec **Approuver** et **Refuser** quand un
+enfant fait une demande. Il faut l'application mobile Home Assistant.
+
+1. **La commande.** Dans l'application, **Espace parents → Réglages**, section
+   *Home Assistant* : copiez la commande dans `configuration.yaml` et le
+   jeton dans `secrets.yaml` (avec l'add-on *File editor*, par exemple), puis
+   redémarrez Home Assistant.
+2. **L'automatisation.** Importez le blueprint :
+   *Paramètres → Automatisations et scènes → Blueprints → Importer un
+   blueprint*, avec l'adresse
+   `https://github.com/poupouproject/tache-et-point-enfants/blob/main/blueprints/automation/quetes_pieces/approbations.yaml`.
+   Créez une automatisation à partir de lui et choisissez le service de
+   notification de votre téléphone (`notify.mobile_app_…`). Pour prévenir les
+   deux parents, un groupe de notification.
+3. **C'est tout.** Une demande déjà réglée (dans l'application ou par l'autre
+   parent) ne peut pas être réglée deux fois, et sa notification disparaît des
+   téléphones.
+
+Le jeton permet d'approuver des demandes, y compris de l'argent : gardez-le
+dans `secrets.yaml`.
+
 ## Vos données
 
 Tout est enregistré dans l'add-on lui-même, et inclus dans les **sauvegardes de

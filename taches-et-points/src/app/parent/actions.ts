@@ -13,6 +13,8 @@ import {
 } from "@/lib/auth/session";
 import { CHILD_COLOR_KEYS, RECURRENCES, TASK_TYPES } from "@/lib/constants";
 import { activeManagedPins, matchesPin } from "@/lib/auth/pins";
+import { announceDecision } from "@/lib/ha/events";
+import { scheduleHaSync } from "@/lib/ha/sync";
 import { recordTransaction } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
 import { resolveConversion, resolveRedemption } from "@/lib/rewards/service";
@@ -23,6 +25,8 @@ export type FormState = { error?: string; success?: string };
 /** Rafraîchit toutes les vues qui dépendent des données modifiées. */
 function revalidateAll() {
   revalidatePath("/", "layout");
+  // Tout changement de l'espace parents peut toucher un capteur de HA.
+  scheduleHaSync();
 }
 
 // --- Enfants ---------------------------------------------------------------
@@ -282,7 +286,9 @@ export async function decideRedemption(formData: FormData) {
 
   if (decision !== "FULFILLED" && decision !== "REJECTED") return;
 
-  await resolveRedemption(id, decision);
+  if (await resolveRedemption(id, decision)) {
+    void announceDecision("recompense", id, decision === "FULFILLED", "app");
+  }
   revalidateAll();
 }
 
@@ -294,7 +300,9 @@ export async function decideConversion(formData: FormData) {
 
   if (decision !== "PAID" && decision !== "REJECTED") return;
 
-  await resolveConversion(id, decision);
+  if (await resolveConversion(id, decision)) {
+    void announceDecision("argent", id, decision === "PAID", "app");
+  }
   revalidateAll();
 }
 

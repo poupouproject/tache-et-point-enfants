@@ -33,6 +33,9 @@ panneau dans la barre latérale, c'est un NIP qui protège l'accès.
 - **Ma carte** — chaque enfant choisit lui-même son avatar et sa couleur.
 - **Installable** — l'app se pose sur l'écran d'accueil d'une tablette et
   s'ouvre en plein écran (voir *Installer sur une tablette*).
+- **Home Assistant** — capteurs (pièces, tâches à faire, demandes en attente),
+  événements pour les automatisations, et approbation des demandes depuis une
+  notification du téléphone (blueprint fourni).
 - **Espace parents** — protégé par un second NIP: tâches, enfants, récompenses,
   ajustements manuels, approbations et réglages.
 
@@ -150,6 +153,8 @@ natifs Linux (ceux de Tailwind, notamment), et le `npm ci` de l'image Docker
 | `DATABASE_URL` | Fichier SQLite, ex. `file:./dev.db` |
 | `SESSION_SECRET` | Clé de signature des sessions, 32 caractères minimum |
 | `APP_TIMEZONE` | Fuseau pour le calcul des journées (défaut `America/Toronto`) |
+| `HA_URL`, `HA_TOKEN` | Facultatifs hors add-on : relier l'app à Home Assistant |
+| `HA_DECISION_TOKEN` | Jeton des décisions venues de HA (32 caractères min., généré par `run.sh`) |
 | `ACCESS_PIN`, `PARENT_PIN` | Facultatifs : NIP imposés, qui font foi sur ceux de l'app (4 à 8 chiffres) |
 
 Générer un secret :
@@ -183,6 +188,29 @@ Options de l'add-on :
 
 Les libellés des options affichés dans Home Assistant sont dans
 `taches-et-points/translations/`.
+
+### Lien avec Home Assistant
+
+`homeassistant_api: true` donne à l'add-on un `SUPERVISOR_TOKEN`; l'app
+appelle l'API de HA par `http://supervisor/core/api` (`src/lib/ha/`). Hors
+add-on, `HA_URL` et `HA_TOKEN` (jeton longue durée) font la même chose; sans
+l'un ni l'autre, tout est sans effet. HA n'est jamais sur le chemin critique:
+un appel échoué est journalisé, l'action de l'enfant passe.
+
+- **Capteurs** `sensor.quetes_pieces_*` publiés par `POST /api/states`, après
+  chaque changement (avec un délai de regroupement) et toutes les cinq minutes,
+  depuis `instrumentation.ts`.
+- **Événements** `quetes_pieces_demande`, `quetes_pieces_decision`,
+  `quetes_pieces_tache` publiés après la transaction qui les justifie.
+- **Retour** : `POST /api/ha/decision` (`{"type","id","decision"}`), protégé
+  par `HA_DECISION_TOKEN` — généré par `run.sh` dans `/data` et affiché dans
+  les réglages. La décision réutilise `resolveRedemption` /
+  `resolveConversion`, qui n'agissent que sur une demande en attente.
+- **Blueprint** : `blueprints/automation/quetes_pieces/approbations.yaml`
+  (notification à boutons → `rest_command.quetes_pieces_decision`).
+
+Détail pour les parents dans `taches-et-points/DOCS.md`, section *Dans Home
+Assistant*.
 
 La fiche de l'add-on dans Home Assistant (onglet Documentation) vient de
 `taches-et-points/DOCS.md`, écrite pour un parent. L'icône et le logo de la
@@ -277,6 +305,7 @@ télécharger: il n'est pas authentifié auprès de GHCR.
 
 ```
 repository.yaml            Déclare le dépôt comme boutique d'add-ons HA
+blueprints/                Blueprint HA: approuver depuis une notification
 .github/workflows/         Publication des images, PR de version, contrôle du changeset
 docs/captures/             Captures d'écran du README
 taches-et-points/          L'add-on (= le contexte de build Docker)

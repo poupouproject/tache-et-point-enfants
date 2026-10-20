@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
+import { announceTask } from "@/lib/ha/events";
 import { prisma } from "@/lib/prisma";
 import { balancesByChild, recordTransaction } from "@/lib/ledger";
 import { isDueNow, occurrenceKey } from "@/lib/tasks/due";
@@ -261,8 +262,9 @@ export async function completeTask(
 
   const periodKey = occurrenceKey(task, childId, now);
 
+  let completionId: string;
   try {
-    await prisma.$transaction(async (tx) => {
+    completionId = await prisma.$transaction(async (tx) => {
       const completion = await tx.taskCompletion.create({
         data: {
           taskId: task.id,
@@ -281,6 +283,8 @@ export async function completeTask(
         description: task.title,
         createdBy: "CHILD",
       });
+
+      return completion.id;
     });
   } catch (error) {
     // P2002 = violation de contrainte unique: quelqu'un a confirmé avant.
@@ -288,6 +292,7 @@ export async function completeTask(
     throw error;
   }
 
+  void announceTask(completionId);
   return { ok: true, points: task.pointsValue, title: task.title };
 }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireUnlocked } from "@/lib/auth/session";
+import { scheduleHaSync } from "@/lib/ha/sync";
 import { completeTask } from "@/lib/tasks/service";
 
 export type CompleteState =
@@ -54,6 +55,7 @@ export async function confirmTask(
   }
 
   revalidatePath("/");
+  scheduleHaSync();
   return {
     status: "done",
     points: result.points,

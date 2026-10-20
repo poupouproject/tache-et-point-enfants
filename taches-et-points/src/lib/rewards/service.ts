@@ -2,10 +2,11 @@ import "server-only";
 
 import { balanceOf, pointsToCents, recordTransaction } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
+import { announceRequest } from "@/lib/ha/events";
 import { isActiveChild } from "@/lib/tasks/service";
 
 export type SpendResult =
-  | { ok: true }
+  | { ok: true; id: string }
   | { ok: false; reason: "INSUFFICIENT_FUNDS" | "NOT_FOUND" };
 
 /**
@@ -26,7 +27,7 @@ export async function requestReward(
   if (!reward || !reward.active) return { ok: false, reason: "NOT_FOUND" };
   if (!(await isActiveChild(childId))) return { ok: false, reason: "NOT_FOUND" };
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const balance = await balanceOf(tx, childId);
     if (balance < reward.costPoints) {
       return { ok: false, reason: "INSUFFICIENT_FUNDS" } as const;
@@ -51,8 +52,12 @@ export async function requestReward(
       createdBy: "CHILD",
     });
 
-    return { ok: true } as const;
+    return { ok: true, id: redemption.id } as const;
   });
+
+  // Après la transaction: Home Assistant ne doit voir que des demandes réelles.
+  if (result.ok) void announceRequest("recompense", result.id);
+  return result;
 }
 
 /** Demande de conversion de points en argent réel. */
@@ -69,7 +74,7 @@ export async function requestConversion(
   }
   if (!(await isActiveChild(childId))) return { ok: false, reason: "NOT_FOUND" };
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const balance = await balanceOf(tx, childId);
     if (balance < points) {
       return { ok: false, reason: "INSUFFICIENT_FUNDS" } as const;
@@ -89,8 +94,11 @@ export async function requestConversion(
       createdBy: "CHILD",
     });
 
-    return { ok: true } as const;
+    return { ok: true, id: conversion.id } as const;
   });
+
+  if (result.ok) void announceRequest("argent", result.id);
+  return result;
 }
 
 /**

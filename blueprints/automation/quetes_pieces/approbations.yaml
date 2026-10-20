@@ -1,0 +1,95 @@
+blueprint:
+  name: Quêtes & Pièces — approuver les demandes
+  description: >-
+    Quand un enfant demande une récompense ou de l'argent dans Quêtes & Pièces,
+    envoie une notification avec « Approuver » et « Refuser » et renvoie la
+    réponse à l'application. Une demande réglée dans l'application retire la
+    notification du téléphone.
+
+    Prérequis : la commande rest_command.quetes_pieces_decision (à copier depuis
+    Espace parents → Réglages de l'application).
+  domain: automation
+  source_url: https://github.com/poupouproject/tache-et-point-enfants/blob/main/blueprints/automation/quetes_pieces/approbations.yaml
+  input:
+    notify_service:
+      name: Service de notification
+      description: >-
+        Par exemple notify.mobile_app_pixel_8. Pour prévenir les deux parents,
+        un groupe de notification (notify.parents).
+      default: notify.notify
+      selector:
+        text:
+    delai:
+      name: Délai de réponse
+      description: >-
+        Passé ce délai, les boutons de la notification ne font plus rien. La
+        demande reste à approuver dans l'application.
+      default: 12
+      selector:
+        number:
+          min: 1
+          max: 72
+          unit_of_measurement: heures
+
+mode: parallel
+max: 20
+
+triggers:
+  - trigger: event
+    event_type: quetes_pieces_demande
+    id: demande
+  - trigger: event
+    event_type: quetes_pieces_decision
+    id: decision
+
+variables:
+  notify_service: !input notify_service
+  delai: !input delai
+  tag: "quetes_pieces_{{ trigger.event.data.id }}"
+  action_ok: "QP_OK_{{ trigger.event.data.id }}"
+  action_non: "QP_NON_{{ trigger.event.data.id }}"
+
+actions:
+  # Demande réglée ailleurs (dans l'application, ou par l'autre parent):
+  # la notification n'a plus lieu d'être.
+  - if:
+      - condition: template
+        value_template: "{{ trigger.id == 'decision' }}"
+    then:
+      - action: "{{ notify_service }}"
+        data:
+          message: clear_notification
+          data:
+            tag: "{{ tag }}"
+      - stop: Notification retirée
+
+  - action: "{{ notify_service }}"
+    data:
+      title: Quêtes & Pièces
+      message: "{{ trigger.event.data.message }}"
+      data:
+        tag: "{{ tag }}"
+        actions:
+          - action: "{{ action_ok }}"
+            title: Approuver
+          - action: "{{ action_non }}"
+            title: Refuser
+
+  - wait_for_trigger:
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "{{ action_ok }}"
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "{{ action_non }}"
+    timeout:
+      hours: "{{ delai }}"
+    continue_on_timeout: false
+
+  - action: rest_command.quetes_pieces_decision
+    data:
+      type: "{{ trigger.event.data.type }}"
+      id: "{{ trigger.event.data.id }}"
+      decision: "{{ 'approuver' if wait.trigger.event.data.action == action_ok else 'refuser' }}"

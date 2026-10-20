@@ -1,6 +1,9 @@
 import { LogOut } from "lucide-react";
 
+import { HaSettings } from "@/components/parent/ha-settings";
 import { SettingsForm } from "@/components/parent/settings-form";
+import { haStatus } from "@/lib/ha/client";
+import { decisionToken } from "@/lib/ha/decision";
 import { activeManagedPins } from "@/lib/auth/pins";
 import { requireParent } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
@@ -15,6 +18,7 @@ export default async function ParentSettingsPage() {
 
   const settings = await prisma.appSettings.findUnique({ where: { id: 1 } });
   const managed = await activeManagedPins(settings);
+  const ha = haStatus();
 
   return (
     <main className="mx-auto w-full max-w-2xl space-y-5">
@@ -38,6 +42,13 @@ export default async function ParentSettingsPage() {
           hors Home Assistant.
         </p>
       </section>
+
+      <HaSettings
+        connected={ha.enabled}
+        lastError={ha.lastError?.message ?? null}
+        hostname={process.env.ADDON_HOSTNAME?.trim() || null}
+        token={decisionToken()}
+      />
 
       <section className="panel p-5">
         <h3 className="font-bold text-white">Session</h3>
