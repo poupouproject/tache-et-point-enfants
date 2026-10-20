@@ -1,5 +1,16 @@
 # Quêtes & Pièces
 
+## 1.3.0
+
+- L'accueil de l'espace parents a une section « Activité » : les tâches faites
+  et les récompenses demandées des deux dernières semaines, regroupées par jour
+  (les jours passés se replient) et filtrables par enfant. Annuler une tâche
+  demande maintenant une confirmation, pour ne plus retirer de pièces par
+  accident.
+- Les NIP peuvent maintenant être fixés dans la configuration de l'application
+  dans Home Assistant : c'est la façon de récupérer un NIP oublié. Laissés vides,
+  ils se gèrent dans l'application comme avant.
+
 ## 1.2.1
 
 - Une tablette restée ouverte pendant une mise à jour se recharge maintenant
