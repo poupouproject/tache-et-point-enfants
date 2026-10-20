@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 
 import { requireUnlocked } from "@/lib/auth/session";
 import { scheduleHaSync } from "@/lib/ha/sync";
-import { updateChildProfile } from "@/lib/children";
+import { updateChildProfile, type SpendLock } from "@/lib/children";
+import { formatUntil } from "@/lib/time";
 import { requestConversion, requestReward } from "@/lib/rewards/service";
 
 export type ProfileState = { error?: string };
@@ -37,6 +38,13 @@ export async function saveProfile(
   redirect("/");
 }
 
+function lockedMessage(lock: SpendLock): string {
+  const until = formatUntil(lock.until);
+  return lock.reason
+    ? `Boutique fermée jusqu'à ${until} : ${lock.reason}`
+    : `Boutique fermée jusqu'à ${until}.`;
+}
+
 export type ShopState =
   | { status: "idle" }
   | { status: "done"; message: string }
@@ -59,9 +67,11 @@ export async function buyReward(
     return {
       status: "error",
       message:
-        result.reason === "INSUFFICIENT_FUNDS"
-          ? "Pas assez de pièces !"
-          : "Cette récompense n'est plus disponible.",
+        result.reason === "LOCKED"
+          ? lockedMessage(result.lock)
+          : result.reason === "INSUFFICIENT_FUNDS"
+            ? "Pas assez de pièces !"
+            : "Cette récompense n'est plus disponible.",
     };
   }
 
@@ -92,9 +102,11 @@ export async function convertToMoney(
     return {
       status: "error",
       message:
-        result.reason === "INSUFFICIENT_FUNDS"
-          ? "Pas assez de pièces !"
-          : "Conversion impossible.",
+        result.reason === "LOCKED"
+          ? lockedMessage(result.lock)
+          : result.reason === "INSUFFICIENT_FUNDS"
+            ? "Pas assez de pièces !"
+            : "Conversion impossible.",
     };
   }
 

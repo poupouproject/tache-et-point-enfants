@@ -2,6 +2,9 @@ import { Eye, EyeOff } from "lucide-react";
 
 import { CoinCount } from "@/components/coin-count";
 import { ChildForm } from "@/components/parent/child-form";
+import { SpendLockForm } from "@/components/parent/spend-lock-form";
+import { activeSpendLock, LOCK_DURATIONS, LOCK_REASON_MAX } from "@/lib/children";
+import { formatUntil } from "@/lib/time";
 import { requireParent } from "@/lib/auth/session";
 import { childColor } from "@/lib/constants";
 import { balancesByChild } from "@/lib/ledger";
@@ -11,6 +14,11 @@ import { cn } from "@/lib/utils";
 import { toggleChild } from "../actions";
 
 export const dynamic = "force-dynamic";
+
+function lockView(kid: { spendLockedUntil: Date | null; spendLockReason: string | null }) {
+  const lock = activeSpendLock(kid);
+  return lock && { until: formatUntil(lock.until), reason: lock.reason };
+}
 
 export default async function ParentChildrenPage() {
   await requireParent();
@@ -22,7 +30,7 @@ export default async function ParentChildrenPage() {
 
   return (
     <main className="grid gap-5 lg:grid-cols-2">
-      <section className="space-y-3">
+      <section className="min-w-0 space-y-3">
         <h2 className="font-hud text-base text-white">Enfants</h2>
 
         {kids.length === 0 ? (
@@ -40,20 +48,21 @@ export default async function ParentChildrenPage() {
                 <li
                   key={kid.id}
                   className={cn(
-                    "panel flex items-center gap-3 border-l-8 p-4",
+                    "panel min-w-0 space-y-3 border-l-8 p-4",
                     colors.border,
                     !kid.active && "opacity-50",
                   )}
                 >
-                  <span className="text-3xl" aria-hidden>
-                    {kid.avatar}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl" aria-hidden>
+                      {kid.avatar}
+                    </span>
 
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-bold text-white">{kid.name}</p>
-                    <p className="text-xs text-hud-400">
-                      {kid.active ? colors.label : "Masqué du tableau"}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-bold text-white">{kid.name}</p>
+                      <p className="text-xs text-hud-400">
+                        {kid.active ? colors.label : "Masqué du tableau"}
+                      </p>
                   </div>
 
                   <CoinCount value={balances.get(kid.id) ?? 0} size="sm" />
@@ -76,6 +85,17 @@ export default async function ParentChildrenPage() {
                       )}
                     </button>
                   </form>
+                  </div>
+
+                  {kid.active && (
+                    <SpendLockForm
+                      childId={kid.id}
+                      childName={kid.name}
+                      lock={lockView(kid)}
+                      durations={LOCK_DURATIONS}
+                      reasonMax={LOCK_REASON_MAX}
+                    />
+                  )}
                 </li>
               );
             })}

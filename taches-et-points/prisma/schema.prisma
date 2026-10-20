@@ -23,6 +23,12 @@ model Child {
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
 
+  /// Boutique bloquée par un parent jusqu'à cet instant: récompenses et argent.
+  /// Gagner des pièces reste possible. Null, ou passé: la boutique est ouverte.
+  spendLockedUntil DateTime?
+  /// Raison du blocage, montrée à l'enfant sur sa carte.
+  spendLockReason  String?
+
   assignedTasks Task[]             @relation("AssignedChild")
   completions   TaskCompletion[]
   transactions  Transaction[]

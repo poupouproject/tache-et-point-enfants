@@ -24,6 +24,11 @@ export function slugify(name: string): string {
   return slug || "enfant";
 }
 
+/** « de Léa », mais « d'Arnaud », « d'Éloi ». */
+export function de(name: string): string {
+  return /^[aeiouyàâäéèêëîïôöùûü]/i.test(name) ? `d'${name}` : `de ${name}`;
+}
+
 export type HaState = {
   entityId: string;
   state: string | number;
@@ -54,7 +59,7 @@ export async function buildStates(now: Date = new Date()): Promise<HaState[]> {
       entityId: `${ENTITY_PREFIX}_${slug}`,
       state: child.balance,
       attributes: {
-        friendly_name: `Pièces de ${child.name}`,
+        friendly_name: `Pièces ${de(child.name)}`,
         unit_of_measurement: "pièces",
         state_class: "measurement",
         icon: "mdi:star-circle",
@@ -64,6 +69,9 @@ export async function buildStates(now: Date = new Date()): Promise<HaState[]> {
         valeur: formatMoney(Math.floor(child.balance / pointsPerDollar) * 100),
         serie: child.streak,
         taches_restantes: child.remaining,
+        boutique_fermee: Boolean(child.spendLock),
+        boutique_fermee_jusqu_a: child.spendLock?.until ?? null,
+        boutique_fermee_raison: child.spendLock?.reason ?? null,
       },
     });
 
@@ -71,7 +79,7 @@ export async function buildStates(now: Date = new Date()): Promise<HaState[]> {
       entityId: `${ENTITY_PREFIX}_${slug}_taches`,
       state: child.remaining,
       attributes: {
-        friendly_name: `Tâches à faire de ${child.name}`,
+        friendly_name: `Tâches à faire ${de(child.name)}`,
         unit_of_measurement: "tâches",
         icon: "mdi:format-list-checks",
         enfant: child.name,

@@ -1110,3 +1110,69 @@ describe("Home Assistant", () => {
     }
   });
 });
+
+describe("boutique fermée par un parent", () => {
+  async function children() {
+    return import("../src/lib/children");
+  }
+  async function setup() {
+    const { alex } = await makeKids();
+    await m.ledger.recordTransaction(m.prisma, {
+      childId: alex.id, type: "MANUAL_ADJUST", points: 200, source: "MANUAL", description: "Départ",
+    });
+    const reward = await m.prisma.reward.create({ data: { name: "Film", costPoints: 20 } });
+    return { alex, reward };
+  }
+
+  it("refuse récompenses et argent, avec la raison", async () => {
+    const c = await children();
+    const { alex, reward } = await setup();
+    assert.equal(await c.lockSpending(alex.id, 60, "  Chambre pas rangée  "), true);
+
+    const buy = await m.rewards.requestReward(alex.id, reward.id);
+    const money = await m.rewards.requestConversion(alex.id, 100);
+
+    assert.equal(buy.ok === false && buy.reason, "LOCKED");
+    assert.equal(buy.ok === false && buy.reason === "LOCKED" && buy.lock.reason, "Chambre pas rangée");
+    assert.equal(money.ok === false && money.reason, "LOCKED");
+    assert.equal(await m.ledger.balanceOf(m.prisma, alex.id), 200, "rien n'est débité");
+  });
+
+  it("laisse gagner des pièces", async () => {
+    const c = await children();
+    const { alex } = await setup();
+    await c.lockSpending(alex.id, 60, "");
+    const task = await m.prisma.task.create({ data: { title: "Lit", type: "EACH", pointsValue: 2, recurrence: "DAILY" } });
+
+    assert.equal((await m.tasks.completeTask(task.id, alex.id)).ok, true);
+  });
+
+  it("rouvre d'elle-même à l'échéance, ou quand un parent la rouvre", async () => {
+    const c = await children();
+    const { alex, reward } = await setup();
+    const past = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    await c.lockSpending(alex.id, 60, "Hier soir", past); // échue depuis une heure
+    assert.equal((await m.rewards.requestReward(alex.id, reward.id)).ok, true);
+
+    await c.lockSpending(alex.id, 60, "");
+    await c.unlockSpending(alex.id);
+    assert.equal((await m.rewards.requestReward(alex.id, reward.id)).ok, true);
+  });
+
+  it("s'affiche sur la carte de l'enfant", async () => {
+    const c = await children();
+    const { alex } = await setup();
+    await c.lockSpending(alex.id, 30, "Écrans");
+
+    const card = (await m.tasks.buildBoard()).find((child) => child.id === alex.id)!;
+    assert.equal(card.spendLock?.reason, "Écrans");
+    assert.match(card.spendLock?.until ?? "", /h/);
+  });
+
+  it("n'accepte que les durées proposées", async () => {
+    const c = await children();
+    const { alex } = await setup();
+    assert.equal(await c.lockSpending(alex.id, 999_999, "trop"), false);
+    assert.equal(await c.lockSpending(alex.id, -5, "négatif"), false);
+  });
+});

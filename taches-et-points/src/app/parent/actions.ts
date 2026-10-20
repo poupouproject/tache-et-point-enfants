@@ -13,6 +13,7 @@ import {
 } from "@/lib/auth/session";
 import { CHILD_COLOR_KEYS, RECURRENCES, TASK_TYPES } from "@/lib/constants";
 import { activeManagedPins, matchesPin } from "@/lib/auth/pins";
+import { lockSpending, unlockSpending } from "@/lib/children";
 import { announceDecision } from "@/lib/ha/events";
 import { scheduleHaSync } from "@/lib/ha/sync";
 import { recordTransaction } from "@/lib/ledger";
@@ -436,4 +437,29 @@ export async function leaveParentMode() {
 export async function logout() {
   await lockKiosk();
   redirect("/login");
+}
+
+// --- Boutique bloquée --------------------------------------------------------
+
+export async function lockChildSpending(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireParent();
+
+  const ok = await lockSpending(
+    String(formData.get("childId") ?? ""),
+    Number(formData.get("minutes")),
+    String(formData.get("reason") ?? ""),
+  );
+  if (!ok) return { error: "Choisissez une durée de la liste." };
+
+  revalidateAll();
+  return {};
+}
+
+export async function unlockChildSpending(formData: FormData) {
+  await requireParent();
+  await unlockSpending(String(formData.get("childId") ?? ""));
+  revalidateAll();
 }

@@ -2,12 +2,14 @@ import "server-only";
 
 import { balanceOf, pointsToCents, recordTransaction } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
+import { spendLockOf, type SpendLock } from "@/lib/children";
 import { announceRequest } from "@/lib/ha/events";
 import { isActiveChild } from "@/lib/tasks/service";
 
 export type SpendResult =
   | { ok: true; id: string }
-  | { ok: false; reason: "INSUFFICIENT_FUNDS" | "NOT_FOUND" };
+  | { ok: false; reason: "INSUFFICIENT_FUNDS" | "NOT_FOUND" }
+  | { ok: false; reason: "LOCKED"; lock: SpendLock };
 
 /**
  * Demande d'échange contre une récompense.
@@ -26,6 +28,10 @@ export async function requestReward(
   const reward = await prisma.reward.findUnique({ where: { id: rewardId } });
   if (!reward || !reward.active) return { ok: false, reason: "NOT_FOUND" };
   if (!(await isActiveChild(childId))) return { ok: false, reason: "NOT_FOUND" };
+  // Contrôlé ici, côté serveur: le bouton grisé de la carte n'est qu'un
+  // affichage, une action reste joignable par POST direct.
+  const lock = await spendLockOf(childId);
+  if (lock) return { ok: false, reason: "LOCKED", lock };
 
   const result = await prisma.$transaction(async (tx) => {
     const balance = await balanceOf(tx, childId);
@@ -73,6 +79,8 @@ export async function requestConversion(
     return { ok: false, reason: "NOT_FOUND" };
   }
   if (!(await isActiveChild(childId))) return { ok: false, reason: "NOT_FOUND" };
+  const lock = await spendLockOf(childId);
+  if (lock) return { ok: false, reason: "LOCKED", lock };
 
   const result = await prisma.$transaction(async (tx) => {
     const balance = await balanceOf(tx, childId);

@@ -1,11 +1,12 @@
 import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
+import { activeSpendLock, type SpendLock } from "@/lib/children";
 import { announceTask } from "@/lib/ha/events";
 import { prisma } from "@/lib/prisma";
 import { balancesByChild, recordTransaction } from "@/lib/ledger";
 import { isDueNow, occurrenceKey } from "@/lib/tasks/due";
-import { dateKeyOf, shiftDateKey } from "@/lib/time";
+import { dateKeyOf, formatUntil, shiftDateKey } from "@/lib/time";
 
 export type DueTask = {
   id: string;
@@ -30,6 +31,8 @@ export type ChildBoard = {
   /** Tâches individuelles encore à faire aujourd'hui: ce que l'enfant DOIT faire. */
   remaining: number;
   doneToday: { title: string; points: number }[];
+  /** Boutique bloquée par un parent: jusqu'à quand (déjà formaté) et pourquoi. */
+  spendLock: { until: string; reason: string | null } | null;
 };
 
 /**
@@ -144,8 +147,13 @@ export async function buildBoard(now: Date = new Date()): Promise<ChildBoard[]> 
       // Ce qui est imposé à l'enfant: ses tâches et celles de chaque enfant.
       remaining: dueTasks.filter((task) => task.type !== "FAMILY").length,
       doneToday,
+      spendLock: lockView(activeSpendLock(child, now), now),
     };
   });
+}
+
+function lockView(lock: SpendLock | null, now: Date) {
+  return lock && { until: formatUntil(lock.until, now), reason: lock.reason };
 }
 
 /**
