@@ -147,6 +147,44 @@ export function dayLabel(dateKey: string, now: Date = new Date()): string {
   }).format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
+/** Écart entre l'heure locale de la famille et UTC à cet instant, en ms. */
+function offsetMs(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  const wall = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  return wall - Math.floor(date.getTime() / 1000) * 1000;
+}
+
+/**
+ * Minuit (début de journée) d'une date de la famille, comme instant UTC.
+ * L'écart avec UTC change avec l'heure d'été: on le mesure autour de la date
+ * visée, en deux passes pour les jours de changement d'heure.
+ */
+export function startOfLocalDay(dateKey: string, timeZone = APP_TIMEZONE): Date {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const wall = Date.UTC(year, month - 1, day);
+  let instant = wall;
+  for (let pass = 0; pass < 2; pass++) {
+    instant = wall - offsetMs(new Date(instant), timeZone);
+  }
+  return new Date(instant);
+}
+
+/** Minuit à la fin de la journée en cours, chez la famille. */
+export function endOfLocalDay(now: Date = new Date()): Date {
+  return startOfLocalDay(shiftDateKey(dateKeyOf(now), 1));
+}
+
 /**
  * Échéance lisible par un enfant: « 18 h 30 » aujourd'hui, « demain à 7 h 00 »,
  * sinon « 23 octobre à 18 h 30 ».
@@ -154,6 +192,10 @@ export function dayLabel(dateKey: string, now: Date = new Date()): string {
 export function formatUntil(date: Date, now: Date = new Date()): string {
   const day = dateKeyOf(date);
   const today = dateKeyOf(now);
+  // « jusqu'à minuit » plutôt que « jusqu'à demain à 00 h 00 ».
+  if (day === shiftDateKey(today, 1) && date.getTime() === startOfLocalDay(day).getTime()) {
+    return "minuit";
+  }
   if (day === today) return TIME_FORMATTER.format(date);
   if (day === shiftDateKey(today, 1)) return `demain à ${TIME_FORMATTER.format(date)}`;
   return formatDateTime(date);

@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { ChildCard } from "@/components/child-card";
 import { FullscreenButton } from "@/components/fullscreen-button";
+import { LiveRefresh } from "@/components/live-refresh";
 import { requireUnlocked } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { buildBoard, familyRemaining } from "@/lib/tasks/service";
@@ -44,6 +45,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto w-full max-w-7xl flex-1 p-4 sm:p-6">
+      <LiveRefresh />
       <header className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-hud text-xl text-white sm:text-2xl">Quêtes &amp; Pièces</h1>

@@ -5,7 +5,7 @@ import { useActionState, useState } from "react";
 
 import { lockChildSpending, unlockChildSpending, type FormState } from "@/app/parent/actions";
 
-type Duration = { minutes: number; label: string };
+type Duration = { key: string; label: string };
 
 /**
  * Fermer la boutique d'un enfant pour un temps: récompenses et argent. Il
@@ -65,9 +65,9 @@ export function SpendLockForm({
           <label htmlFor={`duree-${childId}`} className="label">
             Pendant
           </label>
-          <select id={`duree-${childId}`} name="minutes" defaultValue={60} className="field">
+          <select id={`duree-${childId}`} name="duree" defaultValue="fin-journee" className="field">
             {durations.map((duration) => (
-              <option key={duration.minutes} value={duration.minutes}>
+              <option key={duration.key} value={duration.key}>
                 {duration.label}
               </option>
             ))}
