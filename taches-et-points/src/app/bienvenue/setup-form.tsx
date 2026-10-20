@@ -2,9 +2,15 @@
 
 import { useActionState } from "react";
 
+import { ManagedPin } from "@/components/managed-pin";
+
 import { completeSetup, type SetupState } from "./actions";
 
-export function SetupForm() {
+export function SetupForm({
+  managed,
+}: {
+  managed: { access: boolean; parent: boolean };
+}) {
   const [state, formAction, pending] = useActionState<SetupState, FormData>(
     completeSetup,
     {},
@@ -21,44 +27,52 @@ export function SetupForm() {
         </p>
       </div>
 
-      <div>
-        <label htmlFor="accessPin" className="label">
-          NIP d&apos;entrée
-        </label>
-        <input
-          id="accessPin"
-          name="accessPin"
-          inputMode="numeric"
-          pattern="\d{4,8}"
-          required
-          autoComplete="new-password"
-          placeholder="4 à 8 chiffres"
-          className="field"
-        />
-        <p className="mt-2 text-xs text-hud-400">
-          Toute la famille l&apos;utilise pour ouvrir l&apos;application.
-        </p>
-      </div>
+      {managed.access ? (
+        <ManagedPin label="NIP d'entrée" />
+      ) : (
+        <div>
+          <label htmlFor="accessPin" className="label">
+            NIP d&apos;entrée
+          </label>
+          <input
+            id="accessPin"
+            name="accessPin"
+            inputMode="numeric"
+            pattern="\d{4,8}"
+            required
+            autoComplete="new-password"
+            placeholder="4 à 8 chiffres"
+            className="field"
+          />
+          <p className="mt-2 text-xs text-hud-400">
+            Toute la famille l&apos;utilise pour ouvrir l&apos;application.
+          </p>
+        </div>
+      )}
 
-      <div>
-        <label htmlFor="parentPin" className="label">
-          NIP parent
-        </label>
-        <input
-          id="parentPin"
-          name="parentPin"
-          inputMode="numeric"
-          pattern="\d{4,8}"
-          required
-          autoComplete="new-password"
-          placeholder="4 à 8 chiffres"
-          className="field"
-        />
-        <p className="mt-2 text-xs text-hud-400">
-          Gardez-le pour vous: il donne accès aux tâches, aux pièces et aux
-          réglages.
-        </p>
-      </div>
+      {managed.parent ? (
+        <ManagedPin label="NIP parent" />
+      ) : (
+        <div>
+          <label htmlFor="parentPin" className="label">
+            NIP parent
+          </label>
+          <input
+            id="parentPin"
+            name="parentPin"
+            inputMode="numeric"
+            pattern="\d{4,8}"
+            required
+            autoComplete="new-password"
+            placeholder="4 à 8 chiffres"
+            className="field"
+          />
+          <p className="mt-2 text-xs text-hud-400">
+            Gardez-le pour vous: il donne accès aux tâches, aux pièces et aux
+            réglages.
+          </p>
+        </div>
+      )}
 
       {state.error && (
         <p

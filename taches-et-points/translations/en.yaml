@@ -1,0 +1,19 @@
+configuration:
+  timezone:
+    name: Time zone
+    description: >-
+      The family's time zone, which decides when a day starts for tasks.
+      Example: America/Montreal.
+  access_pin:
+    name: Entry PIN
+    description: >-
+      Optional. 4 to 8 digits. When set, it replaces the app's entry PIN and
+      can no longer be changed in the app. Leave empty to manage it in the app.
+      Useful to recover a forgotten PIN. Restart the app after a change.
+  parent_pin:
+    name: Parent PIN
+    description: >-
+      Optional. 4 to 8 digits, different from the entry PIN. When set, it
+      replaces the parent area PIN and can no longer be changed in the app.
+      Leave empty to manage it in the app. Useful to recover a forgotten PIN.
+      Restart the app after a change.

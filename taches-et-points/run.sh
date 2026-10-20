@@ -31,6 +31,41 @@ fi
 APP_TIMEZONE="${APP_TIMEZONE:-America/Toronto}"
 export APP_TIMEZONE
 
+# --- NIP imposés par Home Assistant ----------------------------------------
+# Facultatifs. Remplis, ils font foi dans l'app (voir src/lib/auth/pins.ts):
+# c'est la récupération d'un NIP oublié. Leur valeur n'est jamais écrite au
+# journal.
+pin_option() {
+  [ -f "$OPTIONS_FILE" ] || return 0
+  OPTION_NAME="$1" node -e "try{const o=require('$OPTIONS_FILE');process.stdout.write(String(o[process.env.OPTION_NAME]??'').trim())}catch(e){}"
+}
+
+ACCESS_PIN_OPTION="$(pin_option access_pin)"
+PARENT_PIN_OPTION="$(pin_option parent_pin)"
+
+if [ -n "$ACCESS_PIN_OPTION" ]; then
+  if printf '%s' "$ACCESS_PIN_OPTION" | grep -Eq '^[0-9]{4,8}$'; then
+    ACCESS_PIN="$ACCESS_PIN_OPTION"
+    export ACCESS_PIN
+    echo "[taches-et-points] NIP d'entrée géré par Home Assistant"
+  else
+    echo "[taches-et-points] option « NIP d'entrée » ignorée: il faut de 4 à 8 chiffres" >&2
+  fi
+fi
+
+if [ -n "$PARENT_PIN_OPTION" ]; then
+  if ! printf '%s' "$PARENT_PIN_OPTION" | grep -Eq '^[0-9]{4,8}$'; then
+    echo "[taches-et-points] option « NIP parent » ignorée: il faut de 4 à 8 chiffres" >&2
+  elif [ "$PARENT_PIN_OPTION" = "${ACCESS_PIN:-}" ]; then
+    # Les enfants entreraient dans l'espace parents avec le NIP d'entrée.
+    echo "[taches-et-points] option « NIP parent » ignorée: identique au NIP d'entrée" >&2
+  else
+    PARENT_PIN="$PARENT_PIN_OPTION"
+    export PARENT_PIN
+    echo "[taches-et-points] NIP parent géré par Home Assistant"
+  fi
+fi
+
 # --- Secret de session ------------------------------------------------------
 # Généré une seule fois puis conservé: le régénérer à chaque démarrage
 # déconnecterait tout le monde à la moindre mise à jour de l'add-on.

@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 
-import { getSettings, unlockKiosk, verifyPin } from "@/lib/auth/session";
+import { checkPin } from "@/lib/auth/pins";
+import { getSettings, unlockKiosk } from "@/lib/auth/session";
 import {
   recordSuccess,
   reserveAttempt,
@@ -31,7 +32,7 @@ export async function submitAccessPin(
     return { error: "L'application n'est pas encore configurée." };
   }
 
-  if (!(await verifyPin(pin, settings.accessPinHash))) {
+  if (!(await checkPin("access", pin))) {
     return { error: "NIP incorrect." };
   }
 

@@ -3,11 +3,14 @@
 import { useActionState } from "react";
 
 import { saveSettings, type FormState } from "@/app/parent/actions";
+import { ManagedPin } from "@/components/managed-pin";
 
 export function SettingsForm({
   pointsPerDollar,
+  managed,
 }: {
   pointsPerDollar: number;
+  managed: { access: boolean; parent: boolean };
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(
     saveSettings,
@@ -36,35 +39,43 @@ export function SettingsForm({
 
       <hr className="border-hud-800" />
 
-      <div>
-        <label htmlFor="accessPin" className="label">
-          Nouveau NIP d&apos;entrée
-        </label>
-        <input
-          id="accessPin"
-          name="accessPin"
-          inputMode="numeric"
-          pattern="\d{4,8}"
-          autoComplete="new-password"
-          placeholder="Laisser vide pour ne pas changer"
-          className="field"
-        />
-      </div>
+      {managed.access ? (
+        <ManagedPin label="NIP d'entrée" />
+      ) : (
+        <div>
+          <label htmlFor="accessPin" className="label">
+            Nouveau NIP d&apos;entrée
+          </label>
+          <input
+            id="accessPin"
+            name="accessPin"
+            inputMode="numeric"
+            pattern="\d{4,8}"
+            autoComplete="new-password"
+            placeholder="Laisser vide pour ne pas changer"
+            className="field"
+          />
+        </div>
+      )}
 
-      <div>
-        <label htmlFor="parentPin" className="label">
-          Nouveau NIP parent
-        </label>
-        <input
-          id="parentPin"
-          name="parentPin"
-          inputMode="numeric"
-          pattern="\d{4,8}"
-          autoComplete="new-password"
-          placeholder="Laisser vide pour ne pas changer"
-          className="field"
-        />
-      </div>
+      {managed.parent ? (
+        <ManagedPin label="NIP parent" />
+      ) : (
+        <div>
+          <label htmlFor="parentPin" className="label">
+            Nouveau NIP parent
+          </label>
+          <input
+            id="parentPin"
+            name="parentPin"
+            inputMode="numeric"
+            pattern="\d{4,8}"
+            autoComplete="new-password"
+            placeholder="Laisser vide pour ne pas changer"
+            className="field"
+          />
+        </div>
+      )}
 
       {state.error && (
         <p role="alert" className="text-sm font-bold text-rose-300">

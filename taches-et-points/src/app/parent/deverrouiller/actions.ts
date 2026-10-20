@@ -6,8 +6,8 @@ import {
   enterParentMode,
   getSettings,
   requireUnlocked,
-  verifyPin,
 } from "@/lib/auth/session";
+import { checkPin } from "@/lib/auth/pins";
 import {
   recordSuccess,
   reserveAttempt,
@@ -35,7 +35,7 @@ export async function submitParentPin(
   const settings = await getSettings();
   if (!settings) return { error: "Application non configurée." };
 
-  if (!(await verifyPin(pin, settings.parentPinHash))) {
+  if (!(await checkPin("parent", pin))) {
     return { error: "NIP incorrect." };
   }
 

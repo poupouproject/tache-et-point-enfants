@@ -39,7 +39,12 @@ ports_description:
 map:
   - data:rw
 
+# Les NIP sont facultatifs: laissés vides, ils se gèrent dans l'app. Remplis,
+# ils font foi — c'est la façon de récupérer un NIP oublié. Les libellés
+# affichés dans Home Assistant sont dans translations/.
 options:
   timezone: America/Toronto
 schema:
   timezone: str
+  access_pin: password?
+  parent_pin: password?

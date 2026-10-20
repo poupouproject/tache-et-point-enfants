@@ -1,0 +1,20 @@
+configuration:
+  timezone:
+    name: Fuseau horaire
+    description: >-
+      Fuseau de la famille, qui décide quand une journée commence pour les
+      tâches. Exemple : America/Montreal.
+  access_pin:
+    name: NIP d'entrée
+    description: >-
+      Facultatif. De 4 à 8 chiffres. Rempli, il remplace le NIP d'entrée de
+      l'application et ne peut plus y être changé. Laissé vide, il se gère dans
+      l'application. Pratique pour récupérer un NIP oublié. Redémarrer
+      l'application après un changement.
+  parent_pin:
+    name: NIP parent
+    description: >-
+      Facultatif. De 4 à 8 chiffres, différent du NIP d'entrée. Rempli, il
+      remplace le NIP de l'espace parents et ne peut plus y être changé. Laissé
+      vide, il se gère dans l'application. Pratique pour récupérer un NIP
+      oublié. Redémarrer l'application après un changement.
