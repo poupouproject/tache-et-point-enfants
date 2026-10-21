@@ -5,6 +5,8 @@
 #
 # Écrit dans $GITHUB_OUTPUT: go=true|false, pr, branche.
 set -euo pipefail
+# shellcheck source=labels.sh
+source "$(dirname "$0")/labels.sh"
 
 repo="$GITHUB_REPOSITORY"
 pr="$PR_INPUT"
@@ -24,7 +26,7 @@ status() {
 
 release_lock_if_held() {
   if has_label "$LOCK"; then
-    gh pr edit "$pr" --repo "$repo" --remove-label "$LOCK" > /dev/null || true
+    label_remove "$pr" "$LOCK"
     echo "Verrou libéré."
     bash "$(dirname "$0")/suivante.sh"
   fi
@@ -40,7 +42,7 @@ if [ "$EVENT" = "pull_request" ]; then
       ;;
     synchronize)
       # Un commit poussé par quelqu'un: ce qui avait été validé ne vaut plus.
-      gh pr edit "$pr" --repo "$repo" --remove-label "$READY" > /dev/null 2>&1 || true
+      label_remove "$pr" "$READY"
       release_lock_if_held
       status pending "Nouveau commit: reposer le label « ready » pour publier"
       exit 0
@@ -96,7 +98,7 @@ for check in "${checks[@]}"; do
   case "$conclusion" in
     success) ;;
     failure | cancelled | timed_out | action_required)
-      gh pr edit "$pr" --repo "$repo" --remove-label "$READY" > /dev/null || true
+      label_remove "$pr" "$READY"
       status failure "« $check » a échoué: corriger, puis reposer « ready »"
       exit 0
       ;;
@@ -117,7 +119,7 @@ if [ -n "$holder" ]; then
   exit 0
 fi
 
-gh pr edit "$pr" --repo "$repo" --add-label "$LOCK" > /dev/null
+label_add "$pr" "$LOCK"
 status pending "Préparation de la version en cours"
 out go true
 out branche "$(field .headRefName)"

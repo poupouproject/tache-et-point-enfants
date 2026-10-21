@@ -207,7 +207,9 @@ jobs:
           pr="${{ needs.porte.outputs.pr }}"
           run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           sha="$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)"
-          gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" --remove-label "$READY" --remove-label "$LOCK" || true
+          source .github/scripts/labels.sh
+          label_remove "$pr" "$READY"
+          label_remove "$pr" "$LOCK"
           gh api "repos/$GITHUB_REPOSITORY/statuses/$sha" -f state=failure -f context="$STATUS" \
             -f description="Échec de la préparation: voir le journal, corriger, reposer « ready »" -f target_url="$run_url" > /dev/null
           gh pr comment "$pr" --repo "$GITHUB_REPOSITORY" --body "La préparation de la version a échoué ([journal]($run_url)). Le label « ready » est retiré et le verrou libéré : corrigez, puis reposez « ready »."

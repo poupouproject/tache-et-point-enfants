@@ -100,16 +100,24 @@ jobs:
     name: Relancer « Prêt à publier »
     needs: [changeset, tests, image]
     runs-on: ubuntu-24.04
+    # Les permissions d'un job remplacent celles du workflow: sans contents et
+    # issues en lecture, la lecture des labels échouait en silence.
     permissions:
       actions: write
+      contents: read
+      issues: read
       pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
       PR: ${{ github.event.pull_request.number }}
     steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/scripts
       - run: |
           set -euo pipefail
-          if gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name' | grep -qx ready; then
+          source .github/scripts/labels.sh
+          if label_has "$PR" ready; then
             gh workflow run pret-a-publier.yml --repo "$GITHUB_REPOSITORY" -f pr="$PR"
             echo "« Prêt à publier » relancé pour la PR #$PR."
           else
