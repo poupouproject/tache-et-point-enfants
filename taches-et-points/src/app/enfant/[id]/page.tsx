@@ -37,14 +37,27 @@ export default async function ChildProfilePage({
         Retour au tableau
       </Link>
 
-      <ProfileForm
-        child={{
-          id: child.id,
-          name: child.name,
-          avatar: child.avatar,
-          color: child.color,
-        }}
-      />
+      {child.canEditProfile ? (
+        <ProfileForm
+          child={{
+            id: child.id,
+            name: child.name,
+            avatar: child.avatar,
+            color: child.color,
+          }}
+        />
+      ) : (
+        // Lien gardé en favori, ou ouvert avant le blocage.
+        <div className="panel p-8 text-center">
+          <p className="text-5xl" aria-hidden>
+            {child.avatar}
+          </p>
+          <p className="mt-4 font-hud text-base leading-relaxed text-white">{child.name}</p>
+          <p className="mt-3 text-sm text-hud-400">
+            Un parent a bloqué les changements de ta carte. Demande-lui si tu veux la changer.
+          </p>
+        </div>
+      )}
     </main>
   );
 }

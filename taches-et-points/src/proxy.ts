@@ -12,7 +12,7 @@ import { SESSION_COOKIE } from "@/lib/auth/session";
  */
 /** Chemins accessibles sans session (écran de NIP et première configuration). */
 // /api/ha: appelé par Home Assistant, sans cookie; protégé par son jeton.
-const PUBLIC_PATHS = ["/login", "/bienvenue", "/version", "/api/ha"];
+const PUBLIC_PATHS = ["/login", "/bienvenue", "/version", "/api/ha", "/nouveautes"];
 
 export function proxy(request: NextRequest) {
   const hasSession = request.cookies.has(SESSION_COOKIE);

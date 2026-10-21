@@ -1,4 +1,10 @@
+import { readFileSync } from "node:fs";
+
 import type { NextConfig } from "next";
+
+// La version de package.json, tenue égale à celle de config.yaml par
+// `npm run version`: c'est celle que Home Assistant affiche.
+const { version } = JSON.parse(readFileSync("./package.json", "utf8")) as { version: string };
 
 const nextConfig: NextConfig = {
   // Sortie autonome: Next ne garde que les modules réellement atteints par le
@@ -12,6 +18,7 @@ const nextConfig: NextConfig = {
   // VersionWatch).
   env: {
     NEXT_PUBLIC_BUILD_ID: new Date().toISOString(),
+    NEXT_PUBLIC_APP_VERSION: version,
   },
 
   // Ces paquets doivent rester chargés par Node à l'exécution plutôt qu'être

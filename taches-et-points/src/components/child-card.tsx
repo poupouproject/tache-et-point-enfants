@@ -9,7 +9,7 @@ import { AnimatedBalance, flyCoins } from "@/components/coin-flight";
 import { CoinCount } from "@/components/coin-count";
 import { TaskIcon } from "@/components/icons";
 import { Modal } from "@/components/modal";
-import { MoneyConverter, RewardShop } from "@/components/shop";
+import { Shop } from "@/components/shop";
 import { childColor } from "@/lib/constants";
 import { formatMoney } from "@/lib/money";
 import type { ChildBoard, DueTask } from "@/lib/tasks/service";
@@ -58,6 +58,7 @@ export function ChildCard({
   const [panel, setPanel] = useState<Panel>(null);
   const [holdBalance, setHoldBalance] = useState(false);
   const balanceRef = useRef<HTMLDivElement>(null);
+  const shopButtonRef = useRef<HTMLButtonElement>(null);
 
   // Sortie de la fenêtre des tâches après un « Bravo »: la fenêtre se ferme,
   // puis les pièces volent de la tâche touchée jusqu'au solde, qui monte
@@ -69,26 +70,50 @@ export function ChildCard({
     setHoldBalance(false);
   }
 
+  // Sortie de la boutique après « Demandé ! »: la fenêtre se ferme, les
+  // pièces quittent le solde pour le bouton Dépenser, et le solde descend.
+  async function spend(points: number) {
+    setPanel(null);
+    const from = balanceRef.current?.getBoundingClientRect();
+    const to = shopButtonRef.current?.getBoundingClientRect();
+    if (from && to) await flyCoins(from, to, points);
+    setHoldBalance(false);
+  }
+
   return (
     <section
       className={cn("panel flex flex-col gap-4 border-t-8 p-5", colors.border)}
       aria-label={`Carte de ${child.name}`}
     >
       <header className="flex items-center gap-4">
-        <Link
-          href={`/enfant/${child.id}`}
-          className={cn(
-            "relative flex size-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-3xl shadow-lg",
-            colors.gradient,
-            colors.glow,
-          )}
-          aria-label={`Changer l'avatar de ${child.name}`}
-        >
-          <span aria-hidden>{child.avatar}</span>
-          <span className="absolute -right-1.5 -bottom-1.5 flex size-7 items-center justify-center rounded-full border-2 border-hud-900 bg-hud-700 text-hud-200">
-            <Pencil className="size-3.5" aria-hidden />
+        {child.canEditProfile ? (
+          <Link
+            href={`/enfant/${child.id}`}
+            className={cn(
+              "relative flex size-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-3xl shadow-lg",
+              colors.gradient,
+              colors.glow,
+            )}
+            aria-label={`Changer l'avatar de ${child.name}`}
+          >
+            <span aria-hidden>{child.avatar}</span>
+            <span className="absolute -right-1.5 -bottom-1.5 flex size-7 items-center justify-center rounded-full border-2 border-hud-900 bg-hud-700 text-hud-200">
+              <Pencil className="size-3.5" aria-hidden />
+            </span>
+          </Link>
+        ) : (
+          // Changement bloqué par un parent: l'avatar n'est plus un lien.
+          <span
+            className={cn(
+              "flex size-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-3xl shadow-lg",
+              colors.gradient,
+              colors.glow,
+            )}
+            aria-hidden
+          >
+            {child.avatar}
           </span>
-        </Link>
+        )}
 
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-hud text-base text-white">{child.name}</h2>
@@ -144,6 +169,7 @@ export function ChildCard({
         </button>
         <div className="grid grid-cols-2 gap-3">
           <button
+            ref={shopButtonRef}
             type="button"
             onClick={() => setPanel("shop")}
             disabled={Boolean(child.spendLock)}
@@ -179,10 +205,15 @@ export function ChildCard({
       </Modal>
 
       <Modal open={panel === "shop"} onClose={() => setPanel(null)} title={`La boutique de ${child.name}`}>
-        <div className="grid gap-5 lg:grid-cols-2">
-          <RewardShop childId={child.id} balance={child.balance} rewards={rewards} />
-          <MoneyConverter childId={child.id} balance={child.balance} pointsPerDollar={pointsPerDollar} />
-        </div>
+        <Shop
+          childId={child.id}
+          balance={child.balance}
+          rewards={rewards}
+          pointsPerDollar={pointsPerDollar}
+          onStart={() => setHoldBalance(true)}
+          onFail={() => setHoldBalance(false)}
+          onDone={spend}
+        />
       </Modal>
 
       <Modal open={panel === "history"} onClose={() => setPanel(null)} title={`L'historique de ${child.name}`}>

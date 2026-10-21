@@ -6,7 +6,7 @@ import { endOfLocalDay } from "@/lib/time";
 
 export type ProfileResult =
   | { ok: true }
-  | { ok: false; reason: "NOT_FOUND" | "INVALID" };
+  | { ok: false; reason: "NOT_FOUND" | "INVALID" | "NOT_ALLOWED" };
 
 /**
  * Change l'avatar et la couleur d'un enfant, depuis sa page de profil.
@@ -25,12 +25,19 @@ export async function updateChildProfile(
   const validColor = (CHILD_COLOR_KEYS as readonly string[]).includes(color);
   if (!validAvatar || !validColor) return { ok: false, reason: "INVALID" };
 
+  // canEditProfile dans le filtre: le contrôle et l'écriture ne font qu'un,
+  // un parent qui retire le droit au même moment ne peut pas être contourné.
   const updated = await prisma.child.updateMany({
-    where: { id: childId, active: true },
+    where: { id: childId, active: true, canEditProfile: true },
     data: { avatar, color },
   });
+  if (updated.count === 1) return { ok: true };
 
-  return updated.count === 1 ? { ok: true } : { ok: false, reason: "NOT_FOUND" };
+  const child = await prisma.child.findUnique({
+    where: { id: childId },
+    select: { active: true, canEditProfile: true },
+  });
+  return { ok: false, reason: child?.active && !child.canEditProfile ? "NOT_ALLOWED" : "NOT_FOUND" };
 }
 
 // --- Boutique bloquée --------------------------------------------------------
@@ -107,6 +114,15 @@ export async function unlockSpending(childId: string): Promise<boolean> {
   const updated = await prisma.child.updateMany({
     where: { id: childId },
     data: { spendLockedUntil: null, spendLockReason: null },
+  });
+  return updated.count === 1;
+}
+
+/** Un parent permet ou retire à un enfant le droit de changer sa carte. */
+export async function setProfileEditable(childId: string, allowed: boolean): Promise<boolean> {
+  const updated = await prisma.child.updateMany({
+    where: { id: childId },
+    data: { canEditProfile: allowed },
   });
   return updated.count === 1;
 }

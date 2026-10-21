@@ -33,6 +33,8 @@ export type ChildBoard = {
   doneToday: { title: string; points: number }[];
   /** Boutique bloquée par un parent: « jusqu'à 18 h 30 » (phrase prête) et pourquoi. */
   spendLock: { until: string; reason: string | null } | null;
+  /** L'enfant peut changer son avatar et sa couleur lui-même. */
+  canEditProfile: boolean;
 };
 
 /**
@@ -148,6 +150,7 @@ export async function buildBoard(now: Date = new Date()): Promise<ChildBoard[]> 
       remaining: dueTasks.filter((task) => task.type !== "FAMILY").length,
       doneToday,
       spendLock: lockView(activeSpendLock(child, now), now),
+      canEditProfile: child.canEditProfile,
     };
   });
 }

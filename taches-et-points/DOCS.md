@@ -64,6 +64,8 @@ et les récompenses.
 - **La section Activité** de l'espace parents montre les deux dernières
   semaines, jour par jour : les tâches faites, ou les récompenses et l'argent
   demandés avec leur statut. Un filtre affiche un seul enfant.
+- **Demander une récompense** passe par une confirmation (« Tu veux… ? Il
+  t'en restera 49 »), puis « Demandé ! » : les pièces quittent le solde.
 - **Les récompenses et l'argent** sont débités dès la demande, puis attendent
   votre approbation sur l'accueil de l'espace parents. Un refus rembourse
   l'enfant.
@@ -77,6 +79,11 @@ et les récompenses.
   appareil (une boutique fermée, une tâche prise par un frère) apparaît en
   moins d'une demi-minute, sans recharger la page. Rien ne bouge pendant
   qu'un enfant a une fenêtre ouverte : la mise à jour suit sa fermeture.
+- **Bloquer les changements d'avatar** : dans **Espace parents → Enfants**,
+  sous l'enfant. Le crayon disparaît de sa carte ; un parent peut le
+  permettre de nouveau.
+- **Nouveautés** : le numéro de version, en bas de chaque page, mène à ce qui
+  a changé, version par version.
 - **Un enfant masqué** garde tout son historique, mais n'apparaît plus au
   tableau et ne peut plus gagner ni dépenser de pièces.
 

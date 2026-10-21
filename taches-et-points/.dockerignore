@@ -12,11 +12,9 @@ node_modules
 tests
 
 # Outillage de versionnage: sans effet sur l'exécution, hors du contexte.
-# CHANGELOG.md reste versionné dans le dépôt — c'est là que Home Assistant le
-# lit pour la page de l'add-on — mais il n'a rien à faire dans l'image.
+# CHANGELOG.md, lui, entre dans l'image: la page « Nouveautés » le lit.
 .changeset
 scripts
-CHANGELOG.md
 
 # Fiche de l'add-on dans Home Assistant: lue dans le dépôt, pas dans l'image.
 DOCS.md

@@ -28,6 +28,9 @@ model Child {
   spendLockedUntil DateTime?
   /// Raison du blocage, montrée à l'enfant sur sa carte.
   spendLockReason  String?
+  /// L'enfant peut changer lui-même son avatar et sa couleur (page « Ma carte »).
+  /// Un parent peut le lui retirer.
+  canEditProfile   Boolean   @default(true)
 
   assignedTasks Task[]             @relation("AssignedChild")
   completions   TaskCompletion[]

@@ -29,7 +29,9 @@ export async function saveProfile(
       error:
         result.reason === "INVALID"
           ? "Choisis un avatar et une couleur dans la liste."
-          : "Cette carte n'existe plus.",
+          : result.reason === "NOT_ALLOWED"
+            ? "Un parent a bloqué les changements de ta carte."
+            : "Cette carte n'existe plus.",
     };
   }
 

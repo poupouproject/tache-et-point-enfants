@@ -13,7 +13,7 @@ import {
 } from "@/lib/auth/session";
 import { CHILD_COLOR_KEYS, RECURRENCES, TASK_TYPES } from "@/lib/constants";
 import { activeManagedPins, matchesPin } from "@/lib/auth/pins";
-import { lockSpending, unlockSpending } from "@/lib/children";
+import { lockSpending, setProfileEditable, unlockSpending } from "@/lib/children";
 import { announceDecision } from "@/lib/ha/events";
 import { scheduleHaSync } from "@/lib/ha/sync";
 import { recordTransaction } from "@/lib/ledger";
@@ -456,6 +456,15 @@ export async function lockChildSpending(
 
   revalidateAll();
   return {};
+}
+
+export async function toggleProfileEditing(formData: FormData) {
+  await requireParent();
+  await setProfileEditable(
+    String(formData.get("childId") ?? ""),
+    formData.get("allowed") === "true",
+  );
+  revalidateAll();
 }
 
 export async function unlockChildSpending(formData: FormData) {
