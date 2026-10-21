@@ -102,8 +102,12 @@ jobs:
       - run: |
           set -euo pipefail
           # La PR qui tenait le verrou vient d'être fusionnée: on le retire.
-          for pr in $(gh pr list --repo "$GITHUB_REPOSITORY" --state merged --label "$LOCK" --json number --jq '.[].number'); do
-            gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" --remove-label "$LOCK" --remove-label "$READY" || true
-            echo "Verrou de la PR #$pr libéré."
+          source .github/scripts/labels.sh
+          # La PR fusionnée garde ses labels de publication: on les retire,
+          # verrou compris s'il n'a pas déjà été libéré à la fermeture.
+          for pr in $(gh pr list --repo "$GITHUB_REPOSITORY" --state merged --limit 20 --json number,labels               --jq ".[] | select(.labels | map(.name) | index(\"$READY\") or index(\"$LOCK\")) | .number"); do
+            label_remove "$pr" "$LOCK"
+            label_remove "$pr" "$READY"
+            echo "Labels de publication retirés de la PR #$pr."
           done
           bash .github/scripts/suivante.sh

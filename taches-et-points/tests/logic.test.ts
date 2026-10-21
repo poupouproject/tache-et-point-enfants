@@ -823,6 +823,19 @@ describe("profil d'un enfant", () => {
     assert.equal(unchanged.avatar, "🦊");
   });
 
+  it("refuse le changement quand un parent l'a bloqué", async () => {
+    const { alex } = await makeKids();
+    const children = await import("../src/lib/children");
+    await children.setProfileEditable(alex.id, false);
+
+    const blocked = await m.children.updateChildProfile(alex.id, "🐲", "purple");
+    assert.equal(blocked.ok === false && blocked.reason, "NOT_ALLOWED");
+    assert.equal((await m.prisma.child.findUniqueOrThrow({ where: { id: alex.id } })).avatar, "🦊");
+
+    await children.setProfileEditable(alex.id, true);
+    assert.equal((await m.children.updateChildProfile(alex.id, "🐲", "purple")).ok, true);
+  });
+
   it("ne touche pas à un enfant masqué", async () => {
     const { alex } = await makeKids();
     await m.prisma.child.update({ where: { id: alex.id }, data: { active: false } });
@@ -1174,6 +1187,29 @@ describe("boutique fermée par un parent", () => {
     const { alex } = await setup();
     assert.equal(await c.lockSpending(alex.id, "999999", "trop"), false);
     assert.equal(await c.lockSpending(alex.id, "-5", "négatif"), false);
+  });
+});
+
+describe("journal des versions", () => {
+  it("lit les versions et leurs entrées, lignes de suite comprises", async () => {
+    const { parseChangelog } = await import("../src/lib/changelog");
+    const releases = parseChangelog(`# Quêtes & Pièces
+
+## 1.5.2
+
+- Une première
+  sur deux lignes.
+- Une seconde.
+
+## 1.0.0
+
+Première version.
+`);
+
+    assert.deepEqual(releases, [
+      { version: "1.5.2", entries: ["Une première sur deux lignes.", "Une seconde."] },
+      { version: "1.0.0", entries: ["Première version."] },
+    ]);
   });
 });
 

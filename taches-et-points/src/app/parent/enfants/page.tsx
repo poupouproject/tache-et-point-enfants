@@ -1,4 +1,4 @@
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Pencil, PencilOff } from "lucide-react";
 
 import { CoinCount } from "@/components/coin-count";
 import { ChildForm } from "@/components/parent/child-form";
@@ -11,7 +11,7 @@ import { balancesByChild } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 
-import { toggleChild } from "../actions";
+import { toggleChild, toggleProfileEditing } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +86,26 @@ export default async function ParentChildrenPage() {
                     </button>
                   </form>
                   </div>
+
+                  {kid.active && (
+                    <form action={toggleProfileEditing}>
+                      <input type="hidden" name="childId" value={kid.id} />
+                      <input type="hidden" name="allowed" value={String(!kid.canEditProfile)} />
+                      <button
+                        type="submit"
+                        className="inline-flex items-center gap-2 text-sm font-bold text-hud-400 transition-colors hover:text-white"
+                      >
+                        {kid.canEditProfile ? (
+                          <Pencil className="size-4" aria-hidden />
+                        ) : (
+                          <PencilOff className="size-4 text-rose-300" aria-hidden />
+                        )}
+                        {kid.canEditProfile
+                          ? `Bloquer les changements d'avatar de ${kid.name}`
+                          : `${kid.name} ne peut pas changer son avatar · Permettre`}
+                      </button>
+                    </form>
+                  )}
 
                   {kid.active && (
                     <SpendLockForm

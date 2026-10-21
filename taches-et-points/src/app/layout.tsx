@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Press_Start_2P, Rubik } from "next/font/google";
 
+import { VersionFooter } from "@/components/version-footer";
 import { VersionWatch } from "@/components/version-watch";
 
 import "./globals.css";
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col">
         {children}
+        <VersionFooter />
         <VersionWatch />
       </body>
     </html>

@@ -93,15 +93,33 @@ jobs:
           arch: ${{ matrix.arch }}
 
   # Le label « ready » a pu être posé pendant que ces vérifications tournaient:
-  # « Prêt à publier » attendait leur résultat, on le relance.
+  # « Prêt à publier » attendait leur résultat, on le relance. Les labels sont
+  # lus maintenant, pas dans l'événement: celui-ci date du commit, d'avant le
+  # label.
   relance:
     name: Relancer « Prêt à publier »
     needs: [changeset, tests, image]
-    if: contains(github.event.pull_request.labels.*.name, 'ready')
     runs-on: ubuntu-24.04
+    # Les permissions d'un job remplacent celles du workflow: sans contents et
+    # issues en lecture, la lecture des labels échouait en silence.
     permissions:
       actions: write
+      contents: read
+      issues: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number }}
     steps:
-      - run: gh workflow run pret-a-publier.yml --repo "$GITHUB_REPOSITORY" -f pr=${{ github.event.pull_request.number }}
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/scripts
+      - run: |
+          set -euo pipefail
+          source .github/scripts/labels.sh
+          if label_has "$PR" ready; then
+            gh workflow run pret-a-publier.yml --repo "$GITHUB_REPOSITORY" -f pr="$PR"
+            echo "« Prêt à publier » relancé pour la PR #$PR."
+          else
+            echo "Pas de label « ready »: rien à relancer."
+          fi
