@@ -18,10 +18,14 @@ runs:
       working-directory: taches-et-points
       run: npm ci
 
+    # PageProps et LayoutProps sont des types que Next génère dans .next/:
+    # absents d'une copie neuve du dépôt, tant que rien n'a été construit.
     - name: Typage
       shell: bash
       working-directory: taches-et-points
-      run: npx tsc --noEmit
+      run: |
+        npx next typegen
+        npx tsc --noEmit
 
     - name: Lint
       shell: bash
