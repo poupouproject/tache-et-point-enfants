@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { requireUnlocked } from "@/lib/auth/session";
 import { scheduleHaSync } from "@/lib/ha/sync";
 import { updateChildProfile, type SpendLock } from "@/lib/children";
-import { formatUntil } from "@/lib/time";
+import { untilPhrase } from "@/lib/time";
 import { requestConversion, requestReward } from "@/lib/rewards/service";
 
 export type ProfileState = { error?: string };
@@ -39,10 +39,10 @@ export async function saveProfile(
 }
 
 function lockedMessage(lock: SpendLock): string {
-  const until = formatUntil(lock.until);
+  const until = untilPhrase(lock.until);
   return lock.reason
-    ? `Boutique fermée jusqu'à ${until} : ${lock.reason}`
-    : `Boutique fermée jusqu'à ${until}.`;
+    ? `Boutique fermée ${until} : ${lock.reason}`
+    : `Boutique fermée ${until}.`;
 }
 
 export type ShopState =

@@ -33,7 +33,7 @@ export function SpendLockForm({
         <input type="hidden" name="childId" value={childId} />
         <Lock className="size-5 shrink-0 text-rose-300" aria-hidden />
         <p className="min-w-0 flex-1 text-sm text-rose-100">
-          <span className="font-bold">Boutique fermée jusqu&apos;à {lock.until}</span>
+          <span className="font-bold">Boutique fermée {lock.until}</span>
           {lock.reason && <span className="block text-rose-200/80">{lock.reason}</span>}
         </p>
         <button type="submit" className="btn-secondary px-4 py-2 text-sm">

@@ -126,7 +126,7 @@ export function ChildCard({
         <p role="status" className="flex items-start gap-2 rounded-2xl bg-rose-500/15 px-4 py-2.5 text-sm font-bold text-rose-200">
           <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>
-            Boutique fermée jusqu&apos;à {child.spendLock.until}
+            Boutique fermée {child.spendLock.until}
             {child.spendLock.reason && <span className="block font-normal text-rose-100">{child.spendLock.reason}</span>}
           </span>
         </p>

@@ -25,9 +25,13 @@ fichier. Voir `taches-et-points/.changeset/README.md`.
 tag GHCR ; `package.json` porte celle que Changesets connaît. `npm run version`
 met les deux à jour ensemble — ne jamais les modifier à la main séparément.
 
-En pratique, personne ne le lance : après chaque fusion sur `main`, la CI tient
-à jour une pull request « Version de l'add-on » qui le fait. La fusionner est
-le geste de publication. Un tag déjà publié n'est jamais réécrit.
+En pratique, personne ne le lance : poser le label `ready` sur une pull
+request vers `main` (fusion automatique activée) déclenche *Prêt à publier*,
+qui calcule la version dans la PR, reteste, puis GitHub fusionne ; *Publier*
+pousse les images et crée la release sur `main`. Chaque PR fusionnée est une
+version : regrouper dans une branche de fonctionnalité. Un nouveau commit
+retire `ready`. Un tag déjà publié n'est jamais réécrit. Détail dans le
+README, section *Publication des images*.
 
 ## Après un `npm install` sous Windows ou macOS
 

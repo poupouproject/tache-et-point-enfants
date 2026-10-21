@@ -1,0 +1,107 @@
+name: Vérifier la PR
+
+# À chaque commit poussé sur une pull request vers main: changeset, tests,
+# puis images. Les images attendent les tests: un échec de tests ne doit pas
+# occuper les runners ARM.
+#
+# Pas de filtre de chemins: ces vérifications sont exigées par la règle de
+# main, et une vérification qui ne tourne jamais bloquerait la fusion d'une PR
+# qui ne touche que la CI ou la documentation.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: verifier-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changeset:
+    name: Un changeset accompagne la branche
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Il faut l'historique pour comparer la branche à sa cible.
+          fetch-depth: 0
+
+      - name: Chercher un changeset ajouté
+        run: |
+          set -euo pipefail
+          base="origin/${{ github.base_ref }}"
+          git fetch --quiet origin "${{ github.base_ref }}"
+
+          # Une branche qui ne touche pas l'add-on n'a rien à annoncer aux parents.
+          if [ -z "$(git diff --name-only "$base...HEAD" -- taches-et-points/)" ]; then
+            echo "L'add-on n'est pas modifié: pas de changeset requis."
+            exit 0
+          fi
+
+          # Uniquement les fichiers AJOUTÉS: modifier le README du dossier
+          # .changeset ne compte pas comme une description de changement.
+          added="$(git diff --name-only --diff-filter=A "$base...HEAD" \
+            -- 'taches-et-points/.changeset/*.md' | grep -v '/README\.md$' || true)"
+          if [ -n "$added" ]; then
+            echo "Changeset trouvé:"
+            echo "$added" | sed 's/^/  - /'
+            exit 0
+          fi
+
+          cat >&2 <<'MESSAGE'
+          Aucun changeset dans cette branche.
+
+          Décrivez le changement pour la personne qui lira la page de mise à
+          jour de l'add-on dans Home Assistant:
+
+              cd taches-et-points
+              npx changeset
+
+          Si le changement n'a aucun effet visible (CI, refactor, dépendances):
+
+              npx changeset add --empty
+          MESSAGE
+          exit 1
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/tests
+
+  image:
+    name: Image ${{ matrix.arch }}
+    needs: tests
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/image
+        with:
+          arch: ${{ matrix.arch }}
+
+  # Le label « ready » a pu être posé pendant que ces vérifications tournaient:
+  # « Prêt à publier » attendait leur résultat, on le relance.
+  relance:
+    name: Relancer « Prêt à publier »
+    needs: [changeset, tests, image]
+    if: contains(github.event.pull_request.labels.*.name, 'ready')
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - run: gh workflow run pret-a-publier.yml --repo "$GITHUB_REPOSITORY" -f pr=${{ github.event.pull_request.number }}
+        env:
+          GH_TOKEN: ${{ github.token }}

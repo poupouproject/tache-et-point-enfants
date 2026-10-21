@@ -70,7 +70,7 @@ export async function buildStates(now: Date = new Date()): Promise<HaState[]> {
         serie: child.streak,
         taches_restantes: child.remaining,
         boutique_fermee: Boolean(child.spendLock),
-        boutique_fermee_jusqu_a: child.spendLock?.until ?? null,
+        boutique_fermee_jusqu_a: child.spendLock?.until ?? null, // « jusqu'à 18 h 30 »
         boutique_fermee_raison: child.spendLock?.reason ?? null,
       },
     });

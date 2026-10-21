@@ -49,11 +49,11 @@ Choix du niveau :
 
 ## Publier une version
 
-Rien à lancer à la main: à chaque fusion sur `main`, la CI ouvre ou met à jour
-la pull request **« Version de l'add-on »**, qui applique les changesets en
-attente (`npm run version`: package.json + config.yaml + CHANGELOG.md).
-Fusionner cette pull request publie l'image sous le nouveau tag, et Home
-Assistant propose la mise à jour.
+Rien à lancer à la main: poser le label **`ready`** sur la pull request. La CI
+applique les changesets de la branche (`npm run version`: package.json +
+config.yaml + CHANGELOG.md) dans la PR, reteste, puis GitHub fusionne et
+*Publier* pousse l'image sous le nouveau tag: Home Assistant propose la mise à
+jour. Voir le README, section *Publication des images*.
 
 `npm run version` reste possible en local; régénérer alors le lockfile sous
 Linux (voir `AGENTS.md`), parce qu'il porte lui aussi la version.
