@@ -1194,6 +1194,13 @@ describe("fin de journée chez la famille", () => {
     const child = await m.prisma.child.findUniqueOrThrow({ where: { id: alex.id } });
 
     assert.equal(child.spendLockedUntil?.toISOString(), "2026-10-21T04:00:00.000Z");
-    assert.equal(m.time.formatUntil(child.spendLockedUntil!, afternoon), "minuit");
+    assert.equal(m.time.untilPhrase(child.spendLockedUntil!, afternoon), "jusqu'à minuit");
+  });
+
+  it("dit « jusqu'au » devant une date", () => {
+    const now = new Date("2026-10-20T19:30:00Z");
+    assert.equal(m.time.untilPhrase(new Date("2026-10-20T22:30:00Z"), now), "jusqu'à 18 h 30");
+    assert.equal(m.time.untilPhrase(new Date("2026-10-21T15:00:00Z"), now), "jusqu'à demain à 11 h 00");
+    assert.match(m.time.untilPhrase(new Date("2026-10-23T22:30:00Z"), now), /^jusqu'au 23 octobre à 18 h 30$/);
   });
 });

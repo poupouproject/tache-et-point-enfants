@@ -1,0 +1,120 @@
+name: Image de l'add-on
+description: >-
+  Construit l'image d'une architecture, vérifie qu'elle démarre, et la publie
+  sur GHCR si on le demande et que la version n'existe pas encore. Une image
+  qui ne démarre pas n'atteint jamais GHCR; un tag déjà publié n'est jamais
+  réécrit (les installations qui l'ont recevraient d'autres binaires sans
+  qu'Home Assistant affiche de mise à jour).
+
+inputs:
+  arch:
+    description: amd64 ou aarch64 (le runner doit être de la même architecture)
+    required: true
+  publier:
+    description: "« true » pour pousser sur GHCR"
+    default: "false"
+  token:
+    description: Jeton avec packages:write, pour publier
+    default: ""
+
+outputs:
+  version:
+    description: Version lue dans config.yaml
+    value: ${{ steps.infos.outputs.version }}
+  publiee:
+    description: "« true » si l'image vient d'être poussée"
+    value: ${{ steps.nouvelle.outputs.publier }}
+
+runs:
+  using: composite
+  steps:
+    - name: Lire la version et l'image de base
+      id: infos
+      shell: bash
+      run: |
+        set -euo pipefail
+        dir=taches-et-points
+
+        # La version de l'add-on fait foi: c'est le tag que le Supervisor cherche.
+        version="$(sed -nE 's/^version:[[:space:]]*"?([^"]+)"?[[:space:]]*$/\1/p' "$dir/config.yaml")"
+        # L'image de base vient de build.yaml pour éviter de la dupliquer ici.
+        build_from="$(sed -nE "s/^[[:space:]]+${{ inputs.arch }}:[[:space:]]*(.+)$/\1/p" "$dir/build.yaml")"
+        if [ -z "$version" ] || [ -z "$build_from" ]; then
+          echo "Version ou image de base introuvable" >&2
+          exit 1
+        fi
+
+        # GHCR n'accepte que des minuscules dans le nom du dépôt.
+        owner="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+        {
+          echo "version=$version"
+          echo "build_from=$build_from"
+          echo "image=ghcr.io/$owner/taches-et-points-${{ inputs.arch }}"
+        } >> "$GITHUB_OUTPUT"
+        echo "Version $version, base $build_from"
+
+    - uses: docker/setup-buildx-action@v3
+
+    - name: Construire
+      uses: docker/build-push-action@v6
+      with:
+        context: taches-et-points
+        build-args: BUILD_FROM=${{ steps.infos.outputs.build_from }}
+        load: true
+        tags: addon-verification
+        cache-from: type=gha,scope=${{ inputs.arch }}
+        cache-to: type=gha,mode=max,scope=${{ inputs.arch }}
+        provenance: false
+
+    - name: Vérifier que l'image démarre
+      shell: bash
+      run: |
+        set -euo pipefail
+        docker run -d --name verif -p 8099:3000 addon-verification
+        for _ in $(seq 1 30); do
+          if curl -fsS -o /dev/null http://localhost:8099/bienvenue; then
+            echo "L'add-on répond."
+            docker rm -f verif > /dev/null
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "L'add-on n'a pas répondu à temps:" >&2
+        docker logs verif >&2
+        exit 1
+
+    - name: Se connecter à GHCR
+      if: inputs.publier == 'true'
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.token }}
+
+    - name: Vérifier que la version est nouvelle
+      id: nouvelle
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ "${{ inputs.publier }}" != "true" ]; then
+          echo "publier=false" >> "$GITHUB_OUTPUT"
+        elif docker buildx imagetools inspect \
+            "${{ steps.infos.outputs.image }}:${{ steps.infos.outputs.version }}" > /dev/null 2>&1; then
+          echo "::notice::La version ${{ steps.infos.outputs.version }} est déjà publiée: rien n'est poussé."
+          echo "publier=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "publier=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Publier
+      if: steps.nouvelle.outputs.publier == 'true'
+      uses: docker/build-push-action@v6
+      with:
+        context: taches-et-points
+        build-args: BUILD_FROM=${{ steps.infos.outputs.build_from }}
+        push: true
+        tags: |
+          ${{ steps.infos.outputs.image }}:${{ steps.infos.outputs.version }}
+          ${{ steps.infos.outputs.image }}:latest
+        cache-from: type=gha,scope=${{ inputs.arch }}
+        provenance: false

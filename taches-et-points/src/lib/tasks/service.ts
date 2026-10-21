@@ -6,7 +6,7 @@ import { announceTask } from "@/lib/ha/events";
 import { prisma } from "@/lib/prisma";
 import { balancesByChild, recordTransaction } from "@/lib/ledger";
 import { isDueNow, occurrenceKey } from "@/lib/tasks/due";
-import { dateKeyOf, formatUntil, shiftDateKey } from "@/lib/time";
+import { dateKeyOf, shiftDateKey, untilPhrase } from "@/lib/time";
 
 export type DueTask = {
   id: string;
@@ -31,7 +31,7 @@ export type ChildBoard = {
   /** Tâches individuelles encore à faire aujourd'hui: ce que l'enfant DOIT faire. */
   remaining: number;
   doneToday: { title: string; points: number }[];
-  /** Boutique bloquée par un parent: jusqu'à quand (déjà formaté) et pourquoi. */
+  /** Boutique bloquée par un parent: « jusqu'à 18 h 30 » (phrase prête) et pourquoi. */
   spendLock: { until: string; reason: string | null } | null;
 };
 
@@ -153,7 +153,7 @@ export async function buildBoard(now: Date = new Date()): Promise<ChildBoard[]> 
 }
 
 function lockView(lock: SpendLock | null, now: Date) {
-  return lock && { until: formatUntil(lock.until, now), reason: lock.reason };
+  return lock && { until: untilPhrase(lock.until, now), reason: lock.reason };
 }
 
 /**

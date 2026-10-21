@@ -1,0 +1,43 @@
+name: Tests de l'add-on
+description: >-
+  Typage, lint, tests de la logique métier (vraie base SQLite jetable) et
+  build Next. Passent avant toute construction d'image: un échec ici ne doit
+  pas occuper les runners, ni retarder une autre pull request.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 24
+        cache: npm
+        cache-dependency-path: taches-et-points/package-lock.json
+
+    - name: Installer
+      shell: bash
+      working-directory: taches-et-points
+      run: npm ci
+
+    # PageProps et LayoutProps sont des types que Next génère dans .next/:
+    # absents d'une copie neuve du dépôt, tant que rien n'a été construit.
+    - name: Typage
+      shell: bash
+      working-directory: taches-et-points
+      run: |
+        npx next typegen
+        npx tsc --noEmit
+
+    - name: Lint
+      shell: bash
+      working-directory: taches-et-points
+      run: npx eslint .
+
+    - name: Tests
+      shell: bash
+      working-directory: taches-et-points
+      run: npm test
+
+    - name: Build Next
+      shell: bash
+      working-directory: taches-et-points
+      run: npm run build

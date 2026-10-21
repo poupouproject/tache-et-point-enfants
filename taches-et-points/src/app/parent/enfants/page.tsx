@@ -4,7 +4,7 @@ import { CoinCount } from "@/components/coin-count";
 import { ChildForm } from "@/components/parent/child-form";
 import { SpendLockForm } from "@/components/parent/spend-lock-form";
 import { activeSpendLock, LOCK_DURATIONS, LOCK_REASON_MAX } from "@/lib/children";
-import { formatUntil } from "@/lib/time";
+import { untilPhrase } from "@/lib/time";
 import { requireParent } from "@/lib/auth/session";
 import { childColor } from "@/lib/constants";
 import { balancesByChild } from "@/lib/ledger";
@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 function lockView(kid: { spendLockedUntil: Date | null; spendLockReason: string | null }) {
   const lock = activeSpendLock(kid);
-  return lock && { until: formatUntil(lock.until), reason: lock.reason };
+  return lock && { until: untilPhrase(lock.until), reason: lock.reason };
 }
 
 export default async function ParentChildrenPage() {

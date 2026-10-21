@@ -232,7 +232,7 @@ Le Supervisor **télécharge** l'image, il ne la construit pas: `config.yaml`
 porte une clé `image:`, et compiler Next.js sur le matériel Home Assistant
 serait long (très long sur un Raspberry Pi).
 
-Les images sont produites par `.github/workflows/publier-addon.yml` vers
+Les images sont produites par `.github/workflows/publier-addon.yml` (*Publier*) vers
 `ghcr.io/poupouproject/taches-et-points-{arch}`. Chaque architecture est
 construite sur un runner de la même architecture: émuler l'ARM en QEMU
 multiplierait la durée du build. Avant toute publication, l'image est démarrée
@@ -244,46 +244,63 @@ sans que la version de `config.yaml` change, rien n'est poussé: les
 installations existantes recevraient sinon d'autres binaires sans que Home
 Assistant affiche de mise à jour.
 
-**Pour livrer une mise à jour**, le versionnage passe par
-[Changesets](https://github.com/changesets/changesets) :
+**Pour livrer une mise à jour** : chaque pull request vers `main` est une
+version. On regroupe en travaillant dans une branche de fonctionnalité (laissée
+en brouillon, ou ouverte sans label), puis on publie le tout d'un geste.
 
-1. Chaque branche décrit son changement :
+1. **Chaque branche décrit son changement** avec un
+   [changeset](https://github.com/changesets/changesets), committé avec le
+   reste :
 
    ```bash
    cd taches-et-points
-   npx changeset       # décrire le changement, choisir patch / minor / major
+   npx changeset       # patch / minor / major, puis la phrase pour les parents
    ```
 
-   et committe le fichier créé dans `.changeset/` avec le reste.
-2. À la fusion sur `main`, `.github/workflows/versionner-addon.yml` ouvre (ou
-   met à jour) une pull request **« Version de l'add-on »**. Elle applique les
-   changesets en attente: nouvelle version dans `package.json` et
-   `config.yaml`, nouvelles entrées dans `CHANGELOG.md`.
-3. **Fusionner cette pull request publie la version**: le push qui en résulte
-   porte un nouveau numéro dans `config.yaml`, les images sont poussées sous ce
-   tag, et Home Assistant propose la mise à jour.
+   Le texte devient une entrée de `CHANGELOG.md`, que Home Assistant affiche
+   sur la page de mise à jour : il se rédige dans les mots d'un parent (voir
+   `taches-et-points/.changeset/README.md`). Sans effet visible (CI,
+   refactor) : `npx changeset add --empty`.
+2. **Ouvrir la pull request et activer la fusion automatique.** À chaque
+   commit, *Vérifier la PR* lance le contrôle du changeset, les **tests**
+   (typage, lint, tests, build Next), puis — seulement s'ils passent — la
+   construction et le démarrage des images `amd64` / `aarch64`.
+3. **Poser le label `ready`.** *Prêt à publier* passe une PR à la fois :
+   - il attend que les vérifications de la PR soient vertes ;
+   - il prend le verrou (label `publication-en-cours`), ou se met en file
+     derrière la PR qui l'a (« En file d'attente derrière #12 ») ;
+   - il ramène la branche à jour avec `main`, lance `npm run version`
+     (`package.json`, `config.yaml`, `CHANGELOG.md`, lockfile régénéré sous
+     Linux) et committe ;
+   - il reteste ce commit (tests puis images) et y pose les statuts exigés.
 
-`npm run version` fait la même chose à la main, si besoin.
+   Le statut **« Prêt à publier »** retient la fusion jusque-là. Ensuite,
+   **GitHub fusionne seul**.
+4. **Sur `main`, *Publier*** lit `config.yaml` : images poussées sur GHCR, tag
+   `vX.Y.Z` et **release GitHub** avec la section du journal, puis libère le
+   verrou et relance la PR suivante en file. Une version déjà publiée n'est
+   jamais refaite : *Publier* peut être relancé sans risque.
 
-**Toute branche qui touche à `taches-et-points/` doit ajouter un changeset**, et
-la CI le vérifie (seule la pull request de version en est dispensée). Ce n'est pas de la bureaucratie: le texte du changeset devient
-une entrée de `taches-et-points/CHANGELOG.md`, que Home Assistant affiche sur la
-page de l'add-on. C'est ce qu'un parent lit pour décider s'il met à jour, donc
-l'entrée se rédige dans ses mots — voir `taches-et-points/.changeset/README.md`.
-Pour un changement sans effet visible: `npx changeset add --empty`.
+**Un nouveau commit retire `ready`** (et le verrou) : il faut reposer le label,
+tout repart de zéro. Le commit de version poussé par la CI fait exception —
+GitHub ne relance pas les workflows pour ses propres commits, d'où les statuts
+posés par *Prêt à publier* après avoir réellement testé ce commit. En cas
+d'échec, la CI retire `ready`, libère le verrou et l'explique en commentaire.
 
-`config.yaml` est le seul numéro que le Supervisor lit (c'est le tag GHCR
-publié, et ce qui déclenche le bouton « Mettre à jour »). `npm run version` le
-tient synchronisé avec `package.json`, il n'y a donc qu'un numéro à gérer.
+`config.yaml` est le seul numéro que le Supervisor lit (c'est le tag GHCR et ce
+qui déclenche « Mettre à jour ») ; `npm run version` le tient synchronisé avec
+`package.json`.
 
 **Réglages du dépôt GitHub** nécessaires :
 
-- *Settings → Actions → General → Workflow permissions* : cocher **« Allow
-  GitHub Actions to create and approve pull requests »**, sans quoi la pull
-  request de version ne peut pas être ouverte.
-- *Settings → Branches* (dépôt public ou GitHub Pro) : protéger `main` en
-  exigeant le contrôle **« Un changeset accompagne la branche »** et les deux
-  builds `amd64` / `aarch64`.
+- *Settings → General* : cocher **« Allow auto-merge »**.
+- *Settings → Rules → Rulesets*, sur `main` : pull request obligatoire,
+  branche à jour avec `main`, pas de force-push, et ces vérifications
+  obligatoires : **Tests**, **Image amd64**, **Image aarch64**, **Un changeset
+  accompagne la branche**, **Prêt à publier**.
+- La fusion automatique s'active **depuis la pull request, par une personne** :
+  activée par la CI, la fusion serait faite au nom du robot, et *Publier* ne
+  partirait pas sur `main`.
 
 **Au tout premier passage**, rendre les deux paquets GHCR publics (Profil
 GitHub → Packages → `taches-et-points-amd64` puis `-aarch64` → Package settings
@@ -308,7 +325,9 @@ télécharger: il n'est pas authentifié auprès de GHCR.
 ```
 repository.yaml            Déclare le dépôt comme boutique d'add-ons HA
 blueprints/                Blueprint HA: approuver depuis une notification
-.github/workflows/         Publication des images, PR de version, contrôle du changeset
+.github/workflows/         Vérifier la PR, Prêt à publier (label ready), Publier
+.github/actions/           Étapes partagées: tests, image (construire, démarrer, publier)
+.github/scripts/           Porte et file d'attente de la publication
 docs/captures/             Captures d'écran du README
 taches-et-points/          L'add-on (= le contexte de build Docker)
   config.yaml              Manifeste: port direct, pas d'ingress, /data, options

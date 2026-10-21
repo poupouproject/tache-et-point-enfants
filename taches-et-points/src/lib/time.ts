@@ -186,19 +186,20 @@ export function endOfLocalDay(now: Date = new Date()): Date {
 }
 
 /**
- * Échéance lisible par un enfant: « 18 h 30 » aujourd'hui, « demain à 7 h 00 »,
- * sinon « 23 octobre à 18 h 30 ».
+ * Échéance lisible par un enfant, préposition comprise: « jusqu'à 18 h 30 »,
+ * « jusqu'à minuit », « jusqu'à demain à 7 h 00 », « jusqu'au 23 octobre à
+ * 18 h 30 » — la date appelle « au », d'où la phrase entière ici.
  */
-export function formatUntil(date: Date, now: Date = new Date()): string {
+export function untilPhrase(date: Date, now: Date = new Date()): string {
   const day = dateKeyOf(date);
   const today = dateKeyOf(now);
   // « jusqu'à minuit » plutôt que « jusqu'à demain à 00 h 00 ».
   if (day === shiftDateKey(today, 1) && date.getTime() === startOfLocalDay(day).getTime()) {
-    return "minuit";
+    return "jusqu'à minuit";
   }
-  if (day === today) return TIME_FORMATTER.format(date);
-  if (day === shiftDateKey(today, 1)) return `demain à ${TIME_FORMATTER.format(date)}`;
-  return formatDateTime(date);
+  if (day === today) return `jusqu'à ${TIME_FORMATTER.format(date)}`;
+  if (day === shiftDateKey(today, 1)) return `jusqu'à demain à ${TIME_FORMATTER.format(date)}`;
+  return `jusqu'au ${formatDateTime(date)}`;
 }
 
 /** Libellé long du jour courant, ex. « vendredi 28 août ». */

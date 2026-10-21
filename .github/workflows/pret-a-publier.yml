@@ -1,0 +1,214 @@
+name: Prêt à publier
+
+# Publier une version = poser le label « ready » sur une pull request vers main
+# dont la fusion automatique est activée.
+#
+#   1. porte    : une PR à la fois (concurrency). Vérifications au vert sur la
+#                 PR? Prend le verrou (label « publication-en-cours ») ou se
+#                 met en file derrière la PR qui l'a.
+#   2. version  : ramène la branche à jour avec main, `npm run version`
+#                 (package.json + config.yaml + CHANGELOG.md), commit.
+#   3. tests, images: sur ce commit-là.
+#   4. feu vert : statuts exigés par la règle de main posés sur le commit de
+#                 version; GitHub fusionne seul (fusion automatique).
+#
+# Le statut « Prêt à publier » reste « en attente » tant que tout ça n'a pas
+# réussi: c'est lui qui retient la fusion automatique.
+#
+# Un commit poussé par quelqu'un retire « ready » (et le verrou): il faut
+# reposer le label, tout repart de zéro. Le commit de version, poussé par la
+# CI, ne déclenche pas ce workflow (GitHub ne relance rien pour GITHUB_TOKEN):
+# pas de boucle. C'est aussi pourquoi le feu vert pose lui-même les statuts
+# des vérifications sur ce commit, après les avoir réellement exécutées.
+#
+# Le verrou est libéré par « Publier » une fois la version publiée sur main,
+# ou ici en cas d'échec ou de fermeture; la PR suivante en file est relancée.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled, closed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Numéro de la pull request à (ré)évaluer
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  statuses: write
+  actions: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  READY: ready
+  LOCK: publication-en-cours
+  STATUS: Prêt à publier
+  # Vérifications exigées par la règle de main, en plus de « Prêt à publier ».
+  CHECKS: "Tests|Image amd64|Image aarch64|Un changeset accompagne la branche"
+
+jobs:
+  porte:
+    name: Préparation · porte
+    runs-on: ubuntu-24.04
+    # Une seule évaluation à la fois, toutes PR confondues: la prise du verrou
+    # est ainsi atomique. On ne garde que cette étape courte sous verrou.
+    concurrency:
+      group: publication-porte
+      cancel-in-progress: false
+    outputs:
+      go: ${{ steps.porte.outputs.go }}
+      pr: ${{ steps.porte.outputs.pr }}
+      branche: ${{ steps.porte.outputs.branche }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/scripts
+      - id: porte
+        run: bash .github/scripts/porte.sh
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          LABEL: ${{ github.event.label.name }}
+          PR_INPUT: ${{ github.event.pull_request.number || inputs.pr }}
+          SENDER: ${{ github.event.sender.login }}
+
+  version:
+    name: Préparation · version
+    needs: porte
+    if: needs.porte.outputs.go == 'true'
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+      version: ${{ steps.commit.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.porte.outputs.branche }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Ramener la branche à jour avec main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --quiet origin main
+
+          # Les fichiers de version sont régénérés plus bas: en cas de conflit
+          # (une version préparée plus tôt sur cette branche), on reprend ceux
+          # de main. Tout autre conflit doit être réglé par une personne.
+          generated="taches-et-points/package.json taches-et-points/package-lock.json taches-et-points/config.yaml taches-et-points/CHANGELOG.md"
+          if ! git merge --no-edit origin/main; then
+            for file in $generated; do
+              if git checkout --theirs -- "$file" 2>/dev/null; then git add "$file"; fi
+            done
+            if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+              echo "::error::Conflit avec main hors des fichiers de version: $(git diff --name-only --diff-filter=U | tr '\n' ' ')"
+              exit 1
+            fi
+            git commit --no-edit
+          fi
+
+      - name: Calculer la version
+        working-directory: taches-et-points
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+          npm run version
+          # Le lockfile porte la version du paquet; régénéré ici, sous Linux,
+          # pour garder les binaires natifs dont l'image a besoin.
+          npm install --package-lock-only --ignore-scripts
+
+      - name: Committer et pousser
+        id: commit
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./taches-et-points/package.json').version")"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Aucun changement de version (changesets vides): rien à committer."
+          else
+            git commit -m "Version de l'add-on $version"
+          fi
+          git push origin "HEAD:${{ needs.porte.outputs.branche }}"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$(git rev-parse HEAD)" \
+            -f state=pending -f context="$STATUS" -f description="Version $version: tests et images en cours" > /dev/null
+
+  # Noms préfixés: un job « Tests » sauté ici ne doit pas se confondre avec
+  # la vérification « Tests » exigée par la règle de main.
+  tests:
+    name: Préparation · tests
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+      - uses: ./.github/actions/tests
+
+  image:
+    name: Préparation · image ${{ matrix.arch }}
+    needs: [version, tests]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+      - uses: ./.github/actions/image
+        with:
+          arch: ${{ matrix.arch }}
+
+  feu-vert:
+    name: Préparation · feu vert
+    needs: [porte, version, tests, image]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Poser les statuts sur le commit de version
+        run: |
+          set -euo pipefail
+          sha="${{ needs.version.outputs.sha }}"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          IFS='|' read -ra checks <<< "$CHECKS"
+          for check in "${checks[@]}"; do
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$sha" -f state=success -f context="$check" \
+              -f description="Exécuté par « Prêt à publier » sur ce commit" -f target_url="$run_url" > /dev/null
+          done
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$sha" -f state=success -f context="$STATUS" \
+            -f description="Version ${{ needs.version.outputs.version }} prête: fusion automatique" -f target_url="$run_url" > /dev/null
+          echo "Feu vert pour la version ${{ needs.version.outputs.version }}."
+
+  echec:
+    name: Préparation · libérer le verrou
+    needs: [porte, version, tests, image, feu-vert]
+    if: failure() && needs.porte.outputs.go == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/scripts
+      - run: |
+          set -euo pipefail
+          pr="${{ needs.porte.outputs.pr }}"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          sha="$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)"
+          gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" --remove-label "$READY" --remove-label "$LOCK" || true
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$sha" -f state=failure -f context="$STATUS" \
+            -f description="Échec de la préparation: voir le journal, corriger, reposer « ready »" -f target_url="$run_url" > /dev/null
+          gh pr comment "$pr" --repo "$GITHUB_REPOSITORY" --body "La préparation de la version a échoué ([journal]($run_url)). Le label « ready » est retiré et le verrou libéré : corrigez, puis reposez « ready »."
+          bash .github/scripts/suivante.sh

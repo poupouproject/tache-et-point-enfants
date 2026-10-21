@@ -1,5 +1,10 @@
 # Quêtes & Pièces
 
+## 1.5.2
+
+- Une boutique fermée pour plusieurs jours s'annonce correctement : « jusqu'au
+  23 octobre à 18 h 30 » plutôt que « jusqu'à 23 octobre ».
+
 ## 1.5.1
 
 - La boutique d'un enfant peut maintenant être fermée « jusqu'à la fin de la
